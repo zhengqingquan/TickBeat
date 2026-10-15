@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -88,6 +89,8 @@ fun MetronomeScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // Parent already applies TopAppBar insets; avoid stacking extra top space.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = viewModel::togglePlaying,
@@ -108,15 +111,13 @@ fun MetronomeScreen(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(12.dp))
-
             BeatIndicators(
                 viewModel = viewModel,
                 beatsPerBar = state.timeSignature.beats,
                 isPlaying = state.isPlaying
             )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = "${state.bpm}",
