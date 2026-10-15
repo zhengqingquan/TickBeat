@@ -49,7 +49,7 @@ fun LatencySettingsScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "判定延迟补偿",
+            text = "设置延迟补偿",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -99,7 +99,7 @@ fun LatencySettingsScreen(
 
         Spacer(Modifier.height(28.dp))
         Text(
-            text = "听 click 校准",
+            text = "听节拍校准",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -148,7 +148,7 @@ fun LatencySettingsScreen(
                         state.beatIndex < 0 || state.beatIndex < state.countInBeats - 1 ->
                             "先听预备拍…"
                         almostReady -> "下一拍开始敲"
-                        else -> "跟着 click 敲"
+                        else -> "跟着节拍敲"
                     },
                     onTap = viewModel::onTap
                 )
@@ -169,7 +169,7 @@ fun LatencySettingsScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         if (measured == null) {
                             Text(
-                                text = "有效敲击不足，请重试（需对准 click）",
+                                text = "有效敲击不足，请重试（需对准节拍）",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {

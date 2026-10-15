@@ -83,7 +83,7 @@ private val drawerDestinations = listOf(
     DrawerDest(Routes.Imitate, "节奏模仿", Icons.Filled.RecordVoiceOver),
     DrawerDest(Routes.SightRead, "视奏节奏", Icons.Filled.MusicNote),
     DrawerDest(Routes.EarTrain, "听辨纠错", Icons.Filled.Hearing),
-    DrawerDest(Routes.Latency, "判定延迟", Icons.Filled.Tune)
+    DrawerDest(Routes.Latency, "设置延迟补偿", Icons.Filled.Tune)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
