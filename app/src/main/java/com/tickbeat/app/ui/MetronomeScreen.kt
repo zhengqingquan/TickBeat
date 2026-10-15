@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -332,27 +334,32 @@ private fun BeatIndicators(
 ) {
     val currentBeat by viewModel.currentBeat.collectAsStateWithLifecycle()
 
-    val dotGap = if (beatsPerBar >= 9) 8.dp else 12.dp
-    val accentSize = if (beatsPerBar >= 9) 16.dp else 22.dp
-    val normalSize = if (beatsPerBar >= 9) 14.dp else 18.dp
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(dotGap),
-        verticalAlignment = Alignment.CenterVertically,
+    // Fixed outer height so changing beat count doesn't shift BPM / controls vertically.
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .fillMaxWidth()
+            .height(56.dp)
     ) {
-        repeat(beatsPerBar) { index ->
-            val beatNumber = index + 1
-            val active = isPlaying && currentBeat == beatNumber
-            Box(
-                modifier = Modifier
-                    .size(if (index == 0) accentSize else normalSize)
-                    .clip(CircleShape)
-                    .background(if (active) TickBeatBeatActive else TickBeatBeatIdle)
-            )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            repeat(beatsPerBar) { index ->
+                val beatNumber = index + 1
+                val active = isPlaying && currentBeat == beatNumber
+                Box(
+                    modifier = Modifier
+                        .size(if (index == 0) 20.dp else 16.dp)
+                        .clip(CircleShape)
+                        .background(if (active) TickBeatBeatActive else TickBeatBeatIdle)
+                )
+            }
         }
     }
 }
