@@ -4,10 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.tickbeat.app.audio.RhythmPlaybackEngine
 import com.tickbeat.app.data.BeatmapRepository
+import com.tickbeat.app.data.TimingPreferences
 import com.tickbeat.app.domain.Beatmap
 import com.tickbeat.app.domain.HitGrade
 import com.tickbeat.app.domain.Judge
+import com.tickbeat.app.domain.JudgeConfig
 import com.tickbeat.app.domain.SessionScore
+import com.tickbeat.app.domain.applyInputOffset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +34,7 @@ data class FollowUiState(
 
 class FollowViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = BeatmapRepository.get(app)
+    private val timing = TimingPreferences.get(app)
     private val engine = RhythmPlaybackEngine()
 
     private val _ui = MutableStateFlow(FollowUiState())
@@ -82,11 +86,12 @@ class FollowViewModel(app: Application) : AndroidViewModel(app) {
         taps.add(eventTimeMs)
         val expected = expectedAudible
         if (expected.isEmpty()) return
-        val nearest = expected.minByOrNull { kotlin.math.abs(it - eventTimeMs) } ?: return
-        val err = kotlin.math.abs(nearest - eventTimeMs)
+        val adjusted = applyInputOffset(eventTimeMs, timing.inputOffsetMs)
+        val nearest = expected.minByOrNull { kotlin.math.abs(it - adjusted) } ?: return
+        val err = kotlin.math.abs(nearest - adjusted)
         val grade = when {
-            err <= 40 -> HitGrade.Perfect
-            err <= 80 -> HitGrade.Good
+            err <= JudgeConfig.PerfectWindowMs -> HitGrade.Perfect
+            err <= JudgeConfig.GoodWindowMs -> HitGrade.Good
             else -> HitGrade.Miss
         }
         _ui.update {
@@ -106,7 +111,10 @@ class FollowViewModel(app: Application) : AndroidViewModel(app) {
         val expected = expectedAudible.ifEmpty {
             map.expectedTimesMs(engine.audibleOriginUptimeMs)
         }
-        val score = Judge.evaluate(expected, taps.toList())
+        val score = Judge.evaluate(
+            expected,
+            applyInputOffset(taps.toList(), timing.inputOffsetMs)
+        )
         _ui.update { it.copy(phase = FollowPhase.Finished, score = score) }
     }
 

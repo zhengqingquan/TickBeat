@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,6 +54,8 @@ import com.tickbeat.app.ui.follow.FollowScreen
 import com.tickbeat.app.ui.follow.FollowViewModel
 import com.tickbeat.app.ui.imitate.ImitateScreen
 import com.tickbeat.app.ui.imitate.ImitateViewModel
+import com.tickbeat.app.ui.settings.LatencySettingsScreen
+import com.tickbeat.app.ui.settings.LatencySettingsViewModel
 import com.tickbeat.app.ui.sightread.SightReadScreen
 import com.tickbeat.app.ui.sightread.SightReadViewModel
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +74,7 @@ private object Routes {
     const val Imitate = "imitate"
     const val SightRead = "sightread"
     const val EarTrain = "eartrain"
+    const val Latency = "latency"
 }
 
 private val drawerDestinations = listOf(
@@ -78,7 +82,8 @@ private val drawerDestinations = listOf(
     DrawerDest(Routes.Follow, "跟拍", Icons.Filled.TouchApp),
     DrawerDest(Routes.Imitate, "节奏模仿", Icons.Filled.RecordVoiceOver),
     DrawerDest(Routes.SightRead, "视奏节奏", Icons.Filled.MusicNote),
-    DrawerDest(Routes.EarTrain, "听辨纠错", Icons.Filled.Hearing)
+    DrawerDest(Routes.EarTrain, "听辨纠错", Icons.Filled.Hearing),
+    DrawerDest(Routes.Latency, "判定延迟", Icons.Filled.Tune)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -211,6 +216,11 @@ fun TickBeatApp() {
                     val vm: EarTrainViewModel = viewModel()
                     StopWhenHidden(visible = route == Routes.EarTrain, stop = vm::stop)
                     EarTrainScreen(viewModel = vm)
+                }
+                KeepAlivePage(visible = route == Routes.Latency, mounted = Routes.Latency in visited) {
+                    val vm: LatencySettingsViewModel = viewModel()
+                    StopWhenHidden(visible = route == Routes.Latency, stop = vm::stop)
+                    LatencySettingsScreen(viewModel = vm)
                 }
             }
         }

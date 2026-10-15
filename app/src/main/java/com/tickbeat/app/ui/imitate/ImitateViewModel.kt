@@ -4,9 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.tickbeat.app.audio.RhythmPlaybackEngine
 import com.tickbeat.app.data.BeatmapRepository
+import com.tickbeat.app.data.TimingPreferences
 import com.tickbeat.app.domain.Beatmap
 import com.tickbeat.app.domain.Judge
 import com.tickbeat.app.domain.SessionScore
+import com.tickbeat.app.domain.applyInputOffset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +32,7 @@ data class ImitateUiState(
 
 class ImitateViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = BeatmapRepository.get(app)
+    private val timing = TimingPreferences.get(app)
     private val engine = RhythmPlaybackEngine()
 
     private val _ui = MutableStateFlow(ImitateUiState())
@@ -102,7 +105,10 @@ class ImitateViewModel(app: Application) : AndroidViewModel(app) {
         val map = _ui.value.selected ?: return
         val origin = engine.audibleOriginUptimeMs.takeIf { it > 0 } ?: recordOrigin
         val expected = map.expectedTimesMs(origin)
-        val score = Judge.evaluate(expected, taps.toList())
+        val score = Judge.evaluate(
+            expected,
+            applyInputOffset(taps.toList(), timing.inputOffsetMs)
+        )
         _ui.update { it.copy(phase = ImitatePhase.Result, score = score, playheadBeat = null) }
     }
 

@@ -6,9 +6,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tickbeat.app.audio.RhythmPlaybackEngine
 import com.tickbeat.app.data.BeatmapRepository
+import com.tickbeat.app.data.TimingPreferences
 import com.tickbeat.app.domain.Beatmap
 import com.tickbeat.app.domain.Judge
 import com.tickbeat.app.domain.SessionScore
+import com.tickbeat.app.domain.applyInputOffset
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,7 @@ data class SightUiState(
 
 class SightReadViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = BeatmapRepository.get(app)
+    private val timing = TimingPreferences.get(app)
     private val engine = RhythmPlaybackEngine()
 
     private val _ui = MutableStateFlow(SightUiState())
@@ -88,7 +91,10 @@ class SightReadViewModel(app: Application) : AndroidViewModel(app) {
         playheadJob?.cancel()
         val map = _ui.value.selected ?: return
         val expected = map.expectedTimesMs(engine.audibleOriginUptimeMs)
-        val score = Judge.evaluate(expected, taps.toList())
+        val score = Judge.evaluate(
+            expected,
+            applyInputOffset(taps.toList(), timing.inputOffsetMs)
+        )
         _ui.update { it.copy(phase = SightPhase.Result, score = score) }
     }
 
