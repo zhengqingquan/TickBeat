@@ -37,10 +37,19 @@ class MetronomeViewModel(
     fun adjustBpm(delta: Int) = setBpm(_uiState.value.bpm + delta)
 
     fun setTimeSignature(signature: TimeSignature) {
-        val beats = signature.beats.coerceIn(1, 12)
-        val safe = signature.copy(beats = beats)
+        val safe = TimeSignature.sanitize(signature.beats, signature.noteValue)
         engine.setBeatsPerBar(safe.beats)
         _uiState.update { it.copy(timeSignature = safe, currentBeat = 0) }
+    }
+
+    fun setBeats(beats: Int) {
+        val current = _uiState.value.timeSignature
+        setTimeSignature(current.copy(beats = beats))
+    }
+
+    fun setNoteValue(noteValue: Int) {
+        val current = _uiState.value.timeSignature
+        setTimeSignature(current.copy(noteValue = noteValue))
     }
 
     fun togglePlaying() {
