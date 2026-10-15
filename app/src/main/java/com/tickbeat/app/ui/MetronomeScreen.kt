@@ -1,14 +1,12 @@
 package com.tickbeat.app.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import android.widget.NumberPicker
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,9 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,23 +41,20 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tickbeat.app.metronome.MetronomeViewModel
 import com.tickbeat.app.metronome.TimeSignature
 import com.tickbeat.app.ui.theme.TickBeatBeatActive
 import com.tickbeat.app.ui.theme.TickBeatBeatIdle
-import kotlin.math.abs
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun MetronomeScreen(
@@ -318,87 +310,63 @@ private fun TimeSignatureWheelPicker(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * Native NumberPicker is much smoother than a Compose LazyColumn snap wheel:
+ * no scrollToItem feedback loop, no per-frame font remeasure.
+ */
 @Composable
 private fun NumberWheel(
     values: List<Int>,
     selected: Int,
     onSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-    itemHeight: Dp = 40.dp,
-    visibleCount: Int = 3
+    modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState()
-    val snapFling = rememberSnapFlingBehavior(lazyListState = listState)
-    val wheelHeight = itemHeight * visibleCount
-    val sidePad = itemHeight * ((visibleCount - 1) / 2)
+    // Remember callback without recreating the view listener every recomposition.
+    val onSelectedState = rememberUpdatedOnSelected(onSelected)
+    val valuesKey = remember(values) { values.toList() }
 
-    LaunchedEffect(selected, values) {
-        val index = values.indexOf(selected).coerceAtLeast(0)
-        if (!listState.isScrollInProgress) {
-            listState.scrollToItem(index)
-        }
-    }
-
-    LaunchedEffect(listState, values) {
-        snapshotFlow {
-            val info = listState.layoutInfo
-            val viewportCenter = info.viewportStartOffset + info.viewportSize.height / 2
-            val centered = info.visibleItemsInfo.minByOrNull { item ->
-                abs((item.offset + item.size / 2) - viewportCenter)
-            }?.index
-            listState.isScrollInProgress to centered
-        }
-            .distinctUntilChanged()
-            .collect { (scrolling, index) ->
-                if (!scrolling && index != null && index in values.indices) {
-                    val value = values[index]
-                    if (value != selected) onSelected(value)
+    AndroidView(
+        modifier = modifier.height(140.dp),
+        factory = { context ->
+            NumberPicker(context).apply {
+                descendantFocusability = NumberPicker.FOCUS_BLOCK_DESCENDANTS
+                wrapSelectorWheel = false
+                minValue = 0
+                maxValue = (valuesKey.size - 1).coerceAtLeast(0)
+                displayedValues = valuesKey.map { it.toString() }.toTypedArray()
+                value = valuesKey.indexOf(selected).coerceAtLeast(0)
+                setOnValueChangedListener { _, _, newIndex ->
+                    if (newIndex in valuesKey.indices) {
+                        onSelectedState(valuesKey[newIndex])
+                    }
                 }
             }
-    }
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier.height(wheelHeight)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(itemHeight)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-        )
-        LazyColumn(
-            state = listState,
-            flingBehavior = snapFling,
-            contentPadding = PaddingValues(vertical = sidePad),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(wheelHeight)
-        ) {
-            itemsIndexed(values, key = { _, value -> value }) { _, value ->
-                val isSelected = value == selected
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(itemHeight)
-                ) {
-                    Text(
-                        text = value.toString(),
-                        fontSize = if (isSelected) 26.sp else 18.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                }
+        },
+        update = { picker ->
+            val display = valuesKey.map { it.toString() }.toTypedArray()
+            val lastIndex = (valuesKey.size - 1).coerceAtLeast(0)
+            if (picker.maxValue != lastIndex ||
+                picker.displayedValues?.contentEquals(display) != true
+            ) {
+                picker.displayedValues = null
+                picker.minValue = 0
+                picker.maxValue = lastIndex
+                picker.displayedValues = display
+            }
+            val index = valuesKey.indexOf(selected).coerceAtLeast(0)
+            if (picker.value != index) {
+                picker.value = index
             }
         }
+    )
+}
+
+@Composable
+private fun rememberUpdatedOnSelected(onSelected: (Int) -> Unit): (Int) -> Unit {
+    val latest = remember { mutableStateOf(onSelected) }
+    latest.value = onSelected
+    return remember {
+        { value: Int -> latest.value(value) }
     }
 }
 
