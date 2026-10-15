@@ -1,6 +1,7 @@
 package com.tickbeat.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -158,23 +159,33 @@ fun LatencySettingsScreen(
             }
             LatencyPhase.Result -> {
                 val measured = state.measuredMs
-                if (measured == null) {
-                    Text(
-                        text = "有效敲击不足，请重试（需对准 click）",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(
-                        text = "测得 ${formatOffset(measured)}",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "匹配 ${state.matchedTaps} 拍",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                // Keep the TapPad-sized slot so result buttons don't jump under the last tap.
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (measured == null) {
+                            Text(
+                                text = "有效敲击不足，请重试（需对准 click）",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                text = "测得 ${formatOffset(measured)}",
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "匹配 ${state.matchedTaps} 拍",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -196,7 +207,7 @@ fun LatencySettingsScreen(
                             contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("重试")
+                        Text("重新校准")
                     }
                     OutlinedButton(onClick = viewModel::discardResult) {
                         Text("取消")
