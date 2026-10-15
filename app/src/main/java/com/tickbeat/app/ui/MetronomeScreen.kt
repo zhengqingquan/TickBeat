@@ -205,10 +205,11 @@ private fun TimeSignaturePresetChips(
     onCustomClick: () -> Unit
 ) {
     val isCustom = selected !in TimeSignature.Presets
+    // No fillMaxWidth: block shrink-wraps to chip rows, parent Column centers it;
+    // chips inside stay start-aligned.
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxWidth()
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         TimeSignature.Presets.forEach { signature ->
             FilterChip(
