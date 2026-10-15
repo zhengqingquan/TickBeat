@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -88,14 +89,19 @@ fun TickBeatApp() {
     val context = LocalContext.current
 
     var route by rememberSaveable { mutableStateOf(Routes.Metronome) }
-    // First visit mounts the page; later switches only flip visibility (no remount).
+    // Metronome first; remaining pages mount right after first paint so drawer switches are warm.
     var visited by rememberSaveable { mutableStateOf(listOf(Routes.Metronome)) }
     val title = drawerDestinations.find { it.route == route }?.title ?: "TickBeat"
+    val allRoutes = drawerDestinations.map { it.route }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             BeatmapRepository.get(context).all()
         }
+        // Let the metronome chrome paint, then mount every other screen off-screen.
+        withFrameMillis { }
+        withFrameMillis { }
+        visited = allRoutes
     }
 
     fun navigateTo(target: String) {
@@ -103,7 +109,6 @@ fun TickBeatApp() {
             if (target !in visited) visited = visited + target
             route = target
         }
-        // Route swaps under the open drawer; first-time composition stays off-screen.
         scope.launch { drawerState.close() }
     }
 
