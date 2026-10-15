@@ -1,7 +1,10 @@
 package com.tickbeat.app.ui
 
 import android.app.Activity
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.view.WindowManager
+import android.widget.EditText
 import android.widget.NumberPicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -46,7 +49,9 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -233,7 +238,7 @@ private fun TimeSignatureWheelPicker(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(vertical = 8.dp, horizontal = 8.dp)
     ) {
         NumberWheel(
@@ -267,6 +272,9 @@ private fun NumberWheel(
 ) {
     val onSelectedState = rememberUpdatedOnSelected(onSelected)
     val valuesKey = remember(values) { values.toList() }
+    val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    val dividerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f).toArgb()
+    val dividerHeightPx = with(LocalDensity.current) { 1.5.dp.roundToPx() }
 
     AndroidView(
         modifier = modifier.height(140.dp),
@@ -274,10 +282,12 @@ private fun NumberWheel(
             NumberPicker(context).apply {
                 descendantFocusability = NumberPicker.FOCUS_BLOCK_DESCENDANTS
                 wrapSelectorWheel = false
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 minValue = 0
                 maxValue = (valuesKey.size - 1).coerceAtLeast(0)
                 displayedValues = valuesKey.map { it.toString() }.toTypedArray()
                 value = valuesKey.indexOf(selected).coerceAtLeast(0)
+                applyTickBeatNumberPickerStyle(textColor, dividerColor, dividerHeightPx)
                 setOnValueChangedListener { _, _, newIndex ->
                     if (newIndex in valuesKey.indices) {
                         onSelectedState(valuesKey[newIndex])
@@ -286,6 +296,7 @@ private fun NumberWheel(
             }
         },
         update = { picker ->
+            picker.applyTickBeatNumberPickerStyle(textColor, dividerColor, dividerHeightPx)
             val display = valuesKey.map { it.toString() }.toTypedArray()
             val lastIndex = (valuesKey.size - 1).coerceAtLeast(0)
             if (picker.maxValue != lastIndex ||
@@ -302,6 +313,30 @@ private fun NumberWheel(
             }
         }
     )
+}
+
+private fun NumberPicker.applyTickBeatNumberPickerStyle(
+    textColor: Int,
+    dividerColor: Int,
+    dividerHeightPx: Int
+) {
+    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        this.textColor = textColor
+        selectionDividerHeight = dividerHeightPx
+    } else {
+        for (i in 0 until childCount) {
+            (getChildAt(i) as? EditText)?.setTextColor(textColor)
+        }
+    }
+    // Soft navy selection rails; ColorDrawable replaces the stock gray/blue divider.
+    try {
+        val field = NumberPicker::class.java.getDeclaredField("mSelectionDivider")
+        field.isAccessible = true
+        field.set(this, ColorDrawable(dividerColor))
+    } catch (_: Exception) {
+        // Field removed on some OEM/API builds; text/bg styling still applies.
+    }
 }
 
 @Composable
