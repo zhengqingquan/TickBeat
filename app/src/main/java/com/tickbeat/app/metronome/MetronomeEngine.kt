@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.PI
@@ -14,12 +15,15 @@ import kotlin.math.sin
 /**
  * AudioTrack-based metronome. Writes click + silence in a dedicated thread
  * so timing follows the audio stream instead of UI timers.
+ *
+ * Beat UI callbacks are delayed by the estimated playback latency so the
+ * indicator lines up with what you hear, not with buffer-write time.
  */
 class MetronomeEngine {
 
     companion object {
         private const val SAMPLE_RATE = 44_100
-        private const val CLICK_MS = 18
+        private const val CLICK_MS = 12
         private const val ACCENT_HZ = 1760.0
         private const val NORMAL_HZ = 880.0
     }
@@ -27,6 +31,7 @@ class MetronomeEngine {
     private val playing = AtomicBoolean(false)
     private val bpm = AtomicInteger(120)
     private val beatsPerBar = AtomicInteger(4)
+    private val callbackGeneration = AtomicInteger(0)
 
     @Volatile
     private var currentBeat: Int = 0
@@ -41,11 +46,6 @@ class MetronomeEngine {
     private val accentClick = synthesizeClick(ACCENT_HZ)
     private val normalClick = synthesizeClick(NORMAL_HZ)
 
-    fun getBpm(): Int = bpm.get()
-    fun getBeatsPerBar(): Int = beatsPerBar.get()
-    fun isPlaying(): Boolean = playing.get()
-    fun getCurrentBeat(): Int = currentBeat
-
     fun setBpm(value: Int) {
         bpm.set(value.coerceIn(30, 300))
     }
@@ -59,19 +59,19 @@ class MetronomeEngine {
         if (playing.get()) return
         playing.set(true)
         currentBeat = 0
+        val generation = callbackGeneration.incrementAndGet()
 
         val minBuf = AudioTrack.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_MONO,
             AudioFormat.ENCODING_PCM_16BIT
         )
-        val bufferSize = minBuf.coerceAtLeast(SAMPLE_RATE / 10)
 
         val audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build()
             )
             .setAudioFormat(
@@ -82,7 +82,7 @@ class MetronomeEngine {
                     .build()
             )
             .setTransferMode(AudioTrack.MODE_STREAM)
-            .setBufferSizeInBytes(bufferSize)
+            .setBufferSizeInBytes(minBuf)
             .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
             .build()
 
@@ -91,7 +91,7 @@ class MetronomeEngine {
 
         worker = Thread({
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
-            runLoop(audioTrack)
+            runLoop(audioTrack, generation)
         }, "MetronomeEngine").also {
             it.isDaemon = true
             it.start()
@@ -101,35 +101,43 @@ class MetronomeEngine {
     @Synchronized
     fun stop() {
         playing.set(false)
+        callbackGeneration.incrementAndGet()
+        mainHandler.removeCallbacksAndMessages(null)
         worker?.join(500)
         worker = null
         track?.let {
             runCatching {
+                it.pause()
+                it.flush()
                 it.stop()
                 it.release()
             }
         }
         track = null
         currentBeat = 0
-        onBeat?.invoke(0)
+        mainHandler.post { onBeat?.invoke(0) }
     }
 
-    private fun runLoop(audioTrack: AudioTrack) {
-        val silenceChunk = ShortArray(512)
+    private fun runLoop(audioTrack: AudioTrack, generation: Int) {
+        val silenceChunk = ShortArray(256)
         var samplesUntilClick = 0
         var beat = 0
+        val latencyMs = estimateLatencyMs(audioTrack)
 
-        while (playing.get()) {
+        while (playing.get() && callbackGeneration.get() == generation) {
             val samplesPerBeat = ((SAMPLE_RATE * 60.0) / bpm.get()).toInt().coerceAtLeast(1)
 
             if (samplesUntilClick <= 0) {
                 val bar = beatsPerBar.get().coerceAtLeast(1)
                 val isAccent = beat % bar == 0
                 val click = if (isAccent) accentClick else normalClick
+                val beatIndex = (beat % bar) + 1
+
+                // Schedule UI for when this click should leave the speaker.
+                scheduleBeat(generation, beatIndex, latencyMs)
                 writeFully(audioTrack, click)
-                currentBeat = (beat % bar) + 1
-                val beatIndex = currentBeat
-                mainHandler.post { onBeat?.invoke(beatIndex) }
+
+                currentBeat = beatIndex
                 beat++
                 samplesUntilClick = (samplesPerBeat - click.size).coerceAtLeast(0)
             }
@@ -140,6 +148,24 @@ class MetronomeEngine {
                 samplesUntilClick -= toWrite
             }
         }
+    }
+
+    private fun scheduleBeat(generation: Int, beatIndex: Int, latencyMs: Long) {
+        val dueAt = SystemClock.uptimeMillis() + latencyMs
+        mainHandler.postAtTime(
+            {
+                if (callbackGeneration.get() != generation || !playing.get()) return@postAtTime
+                currentBeat = beatIndex
+                onBeat?.invoke(beatIndex)
+            },
+            dueAt
+        )
+    }
+
+    private fun estimateLatencyMs(track: AudioTrack): Long {
+        // App-side buffer delay; devices add a bit more hardware path latency.
+        val bufferMs = track.bufferSizeInFrames * 1000L / SAMPLE_RATE
+        return (bufferMs + 25L).coerceIn(30L, 180L)
     }
 
     private fun writeFully(track: AudioTrack, data: ShortArray, length: Int = data.size) {

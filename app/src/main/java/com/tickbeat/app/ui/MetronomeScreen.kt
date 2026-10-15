@@ -1,7 +1,5 @@
 package com.tickbeat.app.ui
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,7 +28,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tickbeat.app.metronome.MetronomeViewModel
 import com.tickbeat.app.ui.theme.TickBeatBeatActive
 import com.tickbeat.app.ui.theme.TickBeatBeatIdle
+import kotlinx.coroutines.delay
 
 private val timeSignatures = listOf(2, 3, 4, 5, 6)
 
@@ -186,6 +190,22 @@ private fun BeatIndicators(
     currentBeat: Int,
     isPlaying: Boolean
 ) {
+    // Flash only the beat that just clicked; no color tween (tween felt late/smeared).
+    var flashBeat by remember { mutableIntStateOf(0) }
+    var flashing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentBeat, isPlaying) {
+        if (!isPlaying || currentBeat <= 0) {
+            flashing = false
+            flashBeat = 0
+            return@LaunchedEffect
+        }
+        flashBeat = currentBeat
+        flashing = true
+        delay(70)
+        flashing = false
+    }
+
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -196,12 +216,13 @@ private fun BeatIndicators(
     ) {
         repeat(beatsPerBar) { index ->
             val beatNumber = index + 1
-            val active = isPlaying && currentBeat == beatNumber
-            val color by animateColorAsState(
-                targetValue = if (active) TickBeatBeatActive else TickBeatBeatIdle,
-                animationSpec = tween(80),
-                label = "beatColor"
-            )
+            val isCurrent = isPlaying && currentBeat == beatNumber
+            val isFlash = flashing && flashBeat == beatNumber
+            val color = when {
+                isFlash -> TickBeatBeatActive
+                isCurrent -> TickBeatBeatActive.copy(alpha = 0.45f)
+                else -> TickBeatBeatIdle
+            }
             Box(
                 modifier = Modifier
                     .size(if (index == 0) 22.dp else 18.dp)
