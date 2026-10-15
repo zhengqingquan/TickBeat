@@ -1,0 +1,16 @@
+{
+  "id": "imitate_clave",
+  "title": "模仿 · 简易 Clave",
+  "bpm": 100,
+  "beatsPerBar": 4,
+  "noteValue": 4,
+  "difficulty": 3,
+  "tags": ["imitate", "sightread", "ear"],
+  "events": [
+    {"tBeat": 0.0, "accent": true},
+    {"tBeat": 1.0, "accent": false},
+    {"tBeat": 1.5, "accent": false},
+    {"tBeat": 2.5, "accent": false},
+    {"tBeat": 3.0, "accent": false}
+  ]
+}
