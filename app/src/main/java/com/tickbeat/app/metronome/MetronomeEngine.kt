@@ -103,19 +103,31 @@ class MetronomeEngine {
         playing.set(false)
         callbackGeneration.incrementAndGet()
         mainHandler.removeCallbacksAndMessages(null)
-        worker?.join(500)
-        worker = null
-        track?.let {
-            runCatching {
-                it.pause()
-                it.flush()
-                it.stop()
-                it.release()
-            }
-        }
-        track = null
         currentBeat = 0
         mainHandler.post { onBeat?.invoke(0) }
+
+        // Join + AudioTrack teardown can take tens–hundreds of ms; never block the UI
+        // thread (e.g. NavHost dispose while the drawer is still closing).
+        val endingWorker = worker
+        val endingTrack = track
+        worker = null
+        track = null
+        if (endingWorker == null && endingTrack == null) return
+
+        Thread({
+            endingWorker?.join(500)
+            endingTrack?.let {
+                runCatching {
+                    it.pause()
+                    it.flush()
+                    it.stop()
+                    it.release()
+                }
+            }
+        }, "MetronomeEngine-stop").apply {
+            isDaemon = true
+            start()
+        }
     }
 
     private fun runLoop(audioTrack: AudioTrack, generation: Int) {

@@ -6,11 +6,22 @@ import com.tickbeat.app.domain.Beatmap
 import com.tickbeat.app.domain.BeatmapFactory
 import org.json.JSONObject
 
-class BeatmapRepository(private val context: Context) {
+class BeatmapRepository private constructor(private val context: Context) {
 
     private val catalog: List<Beatmap> by lazy { builtIn() + loadFromAssets() }
 
     fun all(): List<Beatmap> = catalog
+
+    companion object {
+        @Volatile
+        private var instance: BeatmapRepository? = null
+
+        fun get(context: Context): BeatmapRepository {
+            return instance ?: synchronized(this) {
+                instance ?: BeatmapRepository(context.applicationContext).also { instance = it }
+            }
+        }
+    }
 
     fun byId(id: String): Beatmap? = catalog.find { it.id == id }
 

@@ -1,7 +1,9 @@
 package com.tickbeat.app.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -27,24 +29,34 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import com.tickbeat.app.data.BeatmapRepository
 import com.tickbeat.app.metronome.MetronomeViewModel
 import com.tickbeat.app.ui.eartrain.EarTrainScreen
+import com.tickbeat.app.ui.eartrain.EarTrainViewModel
 import com.tickbeat.app.ui.follow.FollowScreen
+import com.tickbeat.app.ui.follow.FollowViewModel
 import com.tickbeat.app.ui.imitate.ImitateScreen
+import com.tickbeat.app.ui.imitate.ImitateViewModel
 import com.tickbeat.app.ui.sightread.SightReadScreen
+import com.tickbeat.app.ui.sightread.SightReadViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private data class DrawerDest(
     val route: String,
@@ -71,23 +83,28 @@ private val drawerDestinations = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TickBeatApp() {
-    val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val backStack by navController.currentBackStackEntryAsState()
-    val route = backStack?.destination?.route ?: Routes.Metronome
+    val context = LocalContext.current
+
+    var route by rememberSaveable { mutableStateOf(Routes.Metronome) }
+    // First visit mounts the page; later switches only flip visibility (no remount).
+    var visited by rememberSaveable { mutableStateOf(listOf(Routes.Metronome)) }
     val title = drawerDestinations.find { it.route == route }?.title ?: "TickBeat"
 
-    fun navigateTo(target: String) {
-        scope.launch { drawerState.close() }
-        if (target == route) return
-        navController.navigate(target) {
-            popUpTo(navController.graph.startDestinationId) {
-                saveState = true
-            }
-            launchSingleTop = true
-            restoreState = true
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            BeatmapRepository.get(context).all()
         }
+    }
+
+    fun navigateTo(target: String) {
+        if (target != route) {
+            if (target !in visited) visited = visited + target
+            route = target
+        }
+        // Route swaps under the open drawer; first-time composition stays off-screen.
+        scope.launch { drawerState.close() }
     }
 
     ModalNavigationDrawer(
@@ -155,28 +172,61 @@ fun TickBeatApp() {
                 )
             }
         ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = Routes.Metronome,
-                modifier = Modifier.padding(padding)
+            Box(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
             ) {
-                composable(Routes.Metronome) {
+                KeepAlivePage(visible = route == Routes.Metronome, mounted = Routes.Metronome in visited) {
                     val vm: MetronomeViewModel = viewModel()
+                    StopWhenHidden(visible = route == Routes.Metronome, stop = vm::stop)
                     MetronomeScreen(viewModel = vm)
                 }
-                composable(Routes.Follow) {
-                    FollowScreen()
+                KeepAlivePage(visible = route == Routes.Follow, mounted = Routes.Follow in visited) {
+                    val vm: FollowViewModel = viewModel()
+                    StopWhenHidden(visible = route == Routes.Follow, stop = vm::stop)
+                    FollowScreen(viewModel = vm)
                 }
-                composable(Routes.Imitate) {
-                    ImitateScreen()
+                KeepAlivePage(visible = route == Routes.Imitate, mounted = Routes.Imitate in visited) {
+                    val vm: ImitateViewModel = viewModel()
+                    StopWhenHidden(visible = route == Routes.Imitate, stop = vm::stop)
+                    ImitateScreen(viewModel = vm)
                 }
-                composable(Routes.SightRead) {
-                    SightReadScreen()
+                KeepAlivePage(visible = route == Routes.SightRead, mounted = Routes.SightRead in visited) {
+                    val vm: SightReadViewModel = viewModel()
+                    StopWhenHidden(visible = route == Routes.SightRead, stop = vm::stop)
+                    SightReadScreen(viewModel = vm)
                 }
-                composable(Routes.EarTrain) {
-                    EarTrainScreen()
+                KeepAlivePage(visible = route == Routes.EarTrain, mounted = Routes.EarTrain in visited) {
+                    val vm: EarTrainViewModel = viewModel()
+                    StopWhenHidden(visible = route == Routes.EarTrain, stop = vm::stop)
+                    EarTrainScreen(viewModel = vm)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun KeepAlivePage(
+    visible: Boolean,
+    mounted: Boolean,
+    content: @Composable () -> Unit
+) {
+    if (!mounted) return
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(if (visible) 1f else 0f)
+            .graphicsLayer { alpha = if (visible) 1f else 0f }
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun StopWhenHidden(visible: Boolean, stop: () -> Unit) {
+    LaunchedEffect(visible) {
+        if (!visible) stop()
     }
 }

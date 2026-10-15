@@ -29,7 +29,7 @@ data class ImitateUiState(
 )
 
 class ImitateViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = BeatmapRepository(app)
+    private val repo = BeatmapRepository.get(app)
     private val engine = RhythmPlaybackEngine()
 
     private val _ui = MutableStateFlow(ImitateUiState())

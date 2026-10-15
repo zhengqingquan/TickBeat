@@ -161,17 +161,27 @@ class RhythmPlaybackEngine {
         playing.set(false)
         generation.incrementAndGet()
         mainHandler.removeCallbacksAndMessages(null)
-        worker?.join(500)
+
+        val endingWorker = worker
+        val endingTrack = track
         worker = null
-        track?.let {
-            runCatching {
-                it.pause()
-                it.flush()
-                it.stop()
-                it.release()
-            }
-        }
         track = null
+        if (endingWorker == null && endingTrack == null) return
+
+        Thread({
+            endingWorker?.join(500)
+            endingTrack?.let {
+                runCatching {
+                    it.pause()
+                    it.flush()
+                    it.stop()
+                    it.release()
+                }
+            }
+        }, "RhythmPlayback-stop").apply {
+            isDaemon = true
+            start()
+        }
     }
 
     private fun estimateLatencyMs(track: AudioTrack): Long {

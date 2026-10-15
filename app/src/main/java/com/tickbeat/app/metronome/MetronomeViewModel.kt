@@ -58,9 +58,7 @@ class MetronomeViewModel(
 
     fun togglePlaying() {
         if (_uiState.value.isPlaying) {
-            engine.stop()
-            _currentBeat.value = 0
-            _uiState.update { it.copy(isPlaying = false) }
+            stop()
         } else {
             engine.setBpm(_uiState.value.bpm)
             engine.setBeatsPerBar(_uiState.value.beatsPerBar)
@@ -69,9 +67,16 @@ class MetronomeViewModel(
         }
     }
 
-    override fun onCleared() {
+    fun stop() {
         engine.stop()
+        _currentBeat.value = 0
+        _uiState.update { it.copy(isPlaying = false) }
+    }
+
+    override fun onCleared() {
+        stop()
         engine.onBeat = null
         super.onCleared()
     }
 }
+

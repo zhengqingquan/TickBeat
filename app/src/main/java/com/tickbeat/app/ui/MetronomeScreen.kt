@@ -78,6 +78,11 @@ fun MetronomeScreen(
         wheelsReady = true
     }
 
+    // Nav saveState keeps the ViewModel alive across drawer switches; stop audio on leave.
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.stop() }
+    }
+
     DisposableEffect(state.isPlaying, activity) {
         val window = activity?.window
         if (window != null) {

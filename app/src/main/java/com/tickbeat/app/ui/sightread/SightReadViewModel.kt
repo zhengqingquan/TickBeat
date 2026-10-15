@@ -30,7 +30,7 @@ data class SightUiState(
 )
 
 class SightReadViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = BeatmapRepository(app)
+    private val repo = BeatmapRepository.get(app)
     private val engine = RhythmPlaybackEngine()
 
     private val _ui = MutableStateFlow(SightUiState())
