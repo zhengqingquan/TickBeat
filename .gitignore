@@ -1,0 +1,60 @@
+# Built application files
+*.apk
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+release/
+
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local configuration (SDK path, secrets)
+local.properties
+*.keystore
+*.jks
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.navigation/
+captures/
+output.json
+
+# NDK / CMake
+.externalNativeBuild/
+.cxx/
+obj/
+
+# Kotlin
+.kotlin/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / tooling
+.vscode/
+*.swp
+*.swo
+*~
+
+# Log & temp
+*.log
+*.tmp
+*.temp
+
+# Profiling / crash
+*.hprof
