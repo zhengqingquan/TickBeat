@@ -19,8 +19,8 @@ class TimingPreferences private constructor(context: Context) {
         }
 
     companion object {
-        const val MIN_OFFSET = -150
-        const val MAX_OFFSET = 150
+        const val MIN_OFFSET = -300
+        const val MAX_OFFSET = 300
 
         private const val PREFS = "tickbeat_timing"
         private const val KEY_INPUT_OFFSET = "input_offset_ms"

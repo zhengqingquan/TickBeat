@@ -129,7 +129,7 @@ class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Nearest-tap error (tap - expected) within ±150ms; positive = late tap.
+     * Nearest-tap error (tap - expected) within the offset range; positive = late tap.
      */
     private fun matchErrors(expected: List<Long>, tapMs: List<Long>): List<Long> {
         val used = BooleanArray(tapMs.size)
@@ -173,6 +173,6 @@ class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
-        private const val MATCH_WINDOW_MS = 150L
+        private const val MATCH_WINDOW_MS = TimingPreferences.MAX_OFFSET.toLong()
     }
 }
