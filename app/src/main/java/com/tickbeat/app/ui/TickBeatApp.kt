@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Hearing
@@ -38,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -98,10 +98,15 @@ fun TickBeatApp() {
         withContext(Dispatchers.IO) {
             BeatmapRepository.get(context).all()
         }
-        // Let the metronome chrome paint, then mount every other screen off-screen.
+        // Paint metronome first, then warm one destination per frame to avoid a bulk hitch
+        // that makes the first drawer open feel sticky.
         withFrameMillis { }
-        withFrameMillis { }
-        visited = allRoutes
+        for (dest in allRoutes) {
+            if (dest !in visited) {
+                visited = visited + dest
+                withFrameMillis { }
+            }
+        }
     }
 
     fun navigateTo(target: String) {
@@ -219,11 +224,13 @@ private fun KeepAlivePage(
     content: @Composable () -> Unit
 ) {
     if (!mounted) return
+    // Keep composition for instant switches, but collapse hidden pages so the drawer
+    // animation only transforms the active screen (alpha-0 full-size layers were janky,
+    // especially with NumberPicker AndroidViews).
     Box(
         modifier = Modifier
-            .fillMaxSize()
             .zIndex(if (visible) 1f else 0f)
-            .graphicsLayer { alpha = if (visible) 1f else 0f }
+            .then(if (visible) Modifier.fillMaxSize() else Modifier.size(0.dp))
     ) {
         content()
     }
