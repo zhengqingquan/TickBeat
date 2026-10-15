@@ -1,5 +1,7 @@
 package com.tickbeat.app.ui
 
+import android.app.Activity
+import android.view.WindowManager
 import android.widget.NumberPicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,16 +17,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -33,17 +32,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,24 +54,34 @@ import com.tickbeat.app.metronome.MetronomeViewModel
 import com.tickbeat.app.metronome.TimeSignature
 import com.tickbeat.app.ui.theme.TickBeatBeatActive
 import com.tickbeat.app.ui.theme.TickBeatBeatIdle
-import kotlinx.coroutines.delay
 
 @Composable
 fun MetronomeScreen(
     viewModel: MetronomeViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var showCustomPicker by remember { mutableStateOf(false) }
+    val activity = LocalContext.current as? Activity
+    // Inflate NumberPickers after first frames so the main chrome paints immediately.
+    var wheelsReady by remember { mutableStateOf(false) }
 
-    if (showCustomPicker) {
-        CustomTimeSignatureDialog(
-            initial = state.timeSignature,
-            onDismiss = { showCustomPicker = false },
-            onConfirm = { signature ->
-                viewModel.setTimeSignature(signature)
-                showCustomPicker = false
+    LaunchedEffect(Unit) {
+        withFrameMillis { }
+        withFrameMillis { }
+        wheelsReady = true
+    }
+
+    DisposableEffect(state.isPlaying, activity) {
+        val window = activity?.window
+        if (window != null) {
+            if (state.isPlaying) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
-        )
+        }
+        onDispose {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     Scaffold(
@@ -93,11 +103,10 @@ fun MetronomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(24.dp))
 
             Text(
                 text = "TickBeat",
@@ -111,19 +120,19 @@ fun MetronomeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(20.dp))
 
             BeatIndicators(
+                viewModel = viewModel,
                 beatsPerBar = state.timeSignature.beats,
-                currentBeat = state.currentBeat,
                 isPlaying = state.isPlaying
             )
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(20.dp))
 
             Text(
                 text = "${state.bpm}",
-                fontSize = 88.sp,
+                fontSize = 80.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 letterSpacing = (-2).sp
@@ -134,7 +143,7 @@ fun MetronomeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -161,7 +170,7 @@ fun MetronomeScreen(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
             Slider(
                 value = state.bpm.toFloat(),
@@ -170,7 +179,7 @@ fun MetronomeScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = "拍号  ${state.timeSignature.label}",
@@ -178,13 +187,26 @@ fun MetronomeScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(Modifier.height(8.dp))
+
             TimeSignaturePresetChips(
                 selected = state.timeSignature,
-                onSelect = viewModel::setTimeSignature,
-                onCustomClick = { showCustomPicker = true }
+                onSelect = viewModel::setTimeSignature
             )
 
-            Spacer(Modifier.height(100.dp))
+            Spacer(Modifier.height(12.dp))
+
+            if (wheelsReady) {
+                TimeSignatureWheelPicker(
+                    beats = state.timeSignature.beats,
+                    noteValue = state.timeSignature.noteValue,
+                    onBeatsChange = viewModel::setBeats,
+                    onNoteValueChange = viewModel::setNoteValue
+                )
+            } else {
+                Spacer(Modifier.height(156.dp))
+            }
+
+            Spacer(Modifier.weight(1f))
         }
     }
 }
@@ -193,12 +215,8 @@ fun MetronomeScreen(
 @Composable
 private fun TimeSignaturePresetChips(
     selected: TimeSignature,
-    onSelect: (TimeSignature) -> Unit,
-    onCustomClick: () -> Unit
+    onSelect: (TimeSignature) -> Unit
 ) {
-    val isCustom = selected !in TimeSignature.Presets
-    // No fillMaxWidth: block shrink-wraps to chip rows, parent Column centers it;
-    // chips inside stay start-aligned.
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -210,66 +228,7 @@ private fun TimeSignaturePresetChips(
                 label = { Text(signature.label) }
             )
         }
-        FilterChip(
-            selected = isCustom,
-            onClick = onCustomClick,
-            label = {
-                Text(if (isCustom) "自定义 ${selected.label}" else "自定义")
-            }
-        )
     }
-}
-
-@Composable
-private fun CustomTimeSignatureDialog(
-    initial: TimeSignature,
-    onDismiss: () -> Unit,
-    onConfirm: (TimeSignature) -> Unit
-) {
-    var draftBeats by remember(initial) { mutableIntStateOf(initial.beats) }
-    var draftNoteValue by remember(initial) { mutableIntStateOf(initial.noteValue) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("自定义拍号") },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "$draftBeats/$draftNoteValue",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "上下滚动选择",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                TimeSignatureWheelPicker(
-                    beats = draftBeats,
-                    noteValue = draftNoteValue,
-                    onBeatsChange = { draftBeats = it },
-                    onNoteValueChange = { draftNoteValue = it }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirm(TimeSignature.sanitize(draftBeats, draftNoteValue))
-                }
-            ) {
-                Text("完成")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        }
-    )
 }
 
 @Composable
@@ -285,7 +244,7 @@ private fun TimeSignatureWheelPicker(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 8.dp, horizontal = 8.dp)
     ) {
         NumberWheel(
@@ -310,10 +269,6 @@ private fun TimeSignatureWheelPicker(
     }
 }
 
-/**
- * Native NumberPicker is much smoother than a Compose LazyColumn snap wheel:
- * no scrollToItem feedback loop, no per-frame font remeasure.
- */
 @Composable
 private fun NumberWheel(
     values: List<Int>,
@@ -321,7 +276,6 @@ private fun NumberWheel(
     onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Remember callback without recreating the view listener every recomposition.
     val onSelectedState = rememberUpdatedOnSelected(onSelected)
     val valuesKey = remember(values) { values.toList() }
 
@@ -372,24 +326,11 @@ private fun rememberUpdatedOnSelected(onSelected: (Int) -> Unit): (Int) -> Unit 
 
 @Composable
 private fun BeatIndicators(
+    viewModel: MetronomeViewModel,
     beatsPerBar: Int,
-    currentBeat: Int,
     isPlaying: Boolean
 ) {
-    var flashBeat by remember { mutableIntStateOf(0) }
-    var flashing by remember { mutableStateOf(false) }
-
-    LaunchedEffect(currentBeat, isPlaying) {
-        if (!isPlaying || currentBeat <= 0) {
-            flashing = false
-            flashBeat = 0
-            return@LaunchedEffect
-        }
-        flashBeat = currentBeat
-        flashing = true
-        delay(70)
-        flashing = false
-    }
+    val currentBeat by viewModel.currentBeat.collectAsStateWithLifecycle()
 
     val dotGap = if (beatsPerBar >= 9) 8.dp else 12.dp
     val accentSize = if (beatsPerBar >= 9) 16.dp else 22.dp
@@ -405,18 +346,12 @@ private fun BeatIndicators(
     ) {
         repeat(beatsPerBar) { index ->
             val beatNumber = index + 1
-            val isCurrent = isPlaying && currentBeat == beatNumber
-            val isFlash = flashing && flashBeat == beatNumber
-            val color = when {
-                isFlash -> TickBeatBeatActive
-                isCurrent -> TickBeatBeatActive.copy(alpha = 0.45f)
-                else -> TickBeatBeatIdle
-            }
+            val active = isPlaying && currentBeat == beatNumber
             Box(
                 modifier = Modifier
                     .size(if (index == 0) accentSize else normalSize)
                     .clip(CircleShape)
-                    .background(color)
+                    .background(if (active) TickBeatBeatActive else TickBeatBeatIdle)
             )
         }
     }

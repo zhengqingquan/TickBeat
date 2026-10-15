@@ -9,8 +9,7 @@ import kotlinx.coroutines.flow.update
 data class MetronomeUiState(
     val bpm: Int = 120,
     val timeSignature: TimeSignature = TimeSignature.Default,
-    val isPlaying: Boolean = false,
-    val currentBeat: Int = 0
+    val isPlaying: Boolean = false
 ) {
     val beatsPerBar: Int get() = timeSignature.beats
 }
@@ -22,9 +21,13 @@ class MetronomeViewModel(
     private val _uiState = MutableStateFlow(MetronomeUiState())
     val uiState: StateFlow<MetronomeUiState> = _uiState.asStateFlow()
 
+    /** High-frequency beat index — kept off [uiState] so the main chrome doesn't recompose every click. */
+    private val _currentBeat = MutableStateFlow(0)
+    val currentBeat: StateFlow<Int> = _currentBeat.asStateFlow()
+
     init {
         engine.onBeat = { beat ->
-            _uiState.update { it.copy(currentBeat = beat) }
+            _currentBeat.value = beat
         }
     }
 
@@ -39,7 +42,8 @@ class MetronomeViewModel(
     fun setTimeSignature(signature: TimeSignature) {
         val safe = TimeSignature.sanitize(signature.beats, signature.noteValue)
         engine.setBeatsPerBar(safe.beats)
-        _uiState.update { it.copy(timeSignature = safe, currentBeat = 0) }
+        _currentBeat.value = 0
+        _uiState.update { it.copy(timeSignature = safe) }
     }
 
     fun setBeats(beats: Int) {
@@ -55,7 +59,8 @@ class MetronomeViewModel(
     fun togglePlaying() {
         if (_uiState.value.isPlaying) {
             engine.stop()
-            _uiState.update { it.copy(isPlaying = false, currentBeat = 0) }
+            _currentBeat.value = 0
+            _uiState.update { it.copy(isPlaying = false) }
         } else {
             engine.setBpm(_uiState.value.bpm)
             engine.setBeatsPerBar(_uiState.value.beatsPerBar)
