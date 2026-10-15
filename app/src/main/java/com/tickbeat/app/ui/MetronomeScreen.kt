@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,11 +45,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tickbeat.app.metronome.MetronomeViewModel
+import com.tickbeat.app.metronome.TimeSignature
 import com.tickbeat.app.ui.theme.TickBeatBeatActive
 import com.tickbeat.app.ui.theme.TickBeatBeatIdle
 import kotlinx.coroutines.delay
-
-private val timeSignatures = listOf(2, 3, 4, 5, 6)
 
 @Composable
 fun MetronomeScreen(
@@ -94,7 +95,7 @@ fun MetronomeScreen(
             Spacer(Modifier.height(36.dp))
 
             BeatIndicators(
-                beatsPerBar = state.beatsPerBar,
+                beatsPerBar = state.timeSignature.beats,
                 currentBeat = state.currentBeat,
                 isPlaying = state.isPlaying
             )
@@ -153,24 +154,15 @@ fun MetronomeScreen(
             Spacer(Modifier.height(28.dp))
 
             Text(
-                text = "拍号",
+                text = "拍号  ${state.timeSignature.label}",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(Modifier.height(10.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                timeSignatures.forEach { beats ->
-                    FilterChip(
-                        selected = state.beatsPerBar == beats,
-                        onClick = { viewModel.setBeatsPerBar(beats) },
-                        label = { Text("$beats/4") }
-                    )
-                }
-            }
+            TimeSignaturePicker(
+                selected = state.timeSignature,
+                onSelect = viewModel::setTimeSignature
+            )
 
             Spacer(Modifier.weight(1f))
 
@@ -179,6 +171,27 @@ fun MetronomeScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 88.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TimeSignaturePicker(
+    selected: TimeSignature,
+    onSelect: (TimeSignature) -> Unit
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        TimeSignature.Presets.forEach { signature ->
+            FilterChip(
+                selected = selected == signature,
+                onClick = { onSelect(signature) },
+                label = { Text(signature.label) }
             )
         }
     }
@@ -206,8 +219,13 @@ private fun BeatIndicators(
         flashing = false
     }
 
+    val dotGap = if (beatsPerBar >= 9) 8.dp else 12.dp
+    val accentSize = if (beatsPerBar >= 9) 16.dp else 22.dp
+    val normalSize = if (beatsPerBar >= 9) 14.dp else 18.dp
+
+    // Width follows beat count (not full screen); parent Column centers it.
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(dotGap),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
@@ -225,7 +243,7 @@ private fun BeatIndicators(
             }
             Box(
                 modifier = Modifier
-                    .size(if (index == 0) 22.dp else 18.dp)
+                    .size(if (index == 0) accentSize else normalSize)
                     .clip(CircleShape)
                     .background(color)
             )

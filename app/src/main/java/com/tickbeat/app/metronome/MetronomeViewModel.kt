@@ -8,10 +8,12 @@ import kotlinx.coroutines.flow.update
 
 data class MetronomeUiState(
     val bpm: Int = 120,
-    val beatsPerBar: Int = 4,
+    val timeSignature: TimeSignature = TimeSignature.Default,
     val isPlaying: Boolean = false,
     val currentBeat: Int = 0
-)
+) {
+    val beatsPerBar: Int get() = timeSignature.beats
+}
 
 class MetronomeViewModel(
     private val engine: MetronomeEngine = MetronomeEngine()
@@ -34,10 +36,11 @@ class MetronomeViewModel(
 
     fun adjustBpm(delta: Int) = setBpm(_uiState.value.bpm + delta)
 
-    fun setBeatsPerBar(beats: Int) {
-        val clamped = beats.coerceIn(1, 12)
-        engine.setBeatsPerBar(clamped)
-        _uiState.update { it.copy(beatsPerBar = clamped, currentBeat = 0) }
+    fun setTimeSignature(signature: TimeSignature) {
+        val beats = signature.beats.coerceIn(1, 12)
+        val safe = signature.copy(beats = beats)
+        engine.setBeatsPerBar(safe.beats)
+        _uiState.update { it.copy(timeSignature = safe, currentBeat = 0) }
     }
 
     fun togglePlaying() {
