@@ -104,7 +104,7 @@ fun LatencySettingsScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "听到 click 立即敲击（约 8 拍）。结束后取误差中位数作为建议补偿。",
+            text = "先听 ${state.countInBeats} 拍预备，再跟着敲 ${state.measureBeats} 拍。结束后取误差中位数作为建议补偿。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -124,14 +124,31 @@ fun LatencySettingsScreen(
                 }
             }
             LatencyPhase.Calibrating -> {
-                Text(
-                    text = if (state.beatIndex >= 0) "拍 ${state.beatIndex + 1} / 8" else "准备…",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                // Mutually exclusive: never show measure progress during count-in (avoids “拍 0/8”).
+                val statusText = when {
+                    state.beatIndex < 0 -> "预备…"
+                    state.beatIndex < state.countInBeats ->
+                        "预备 ${state.beatIndex + 1} / ${state.countInBeats}"
+                    else -> {
+                        val n = (state.beatIndex - state.countInBeats + 1)
+                            .coerceIn(1, state.measureBeats)
+                        "拍 $n / ${state.measureBeats}"
+                    }
+                }
+                Text(text = statusText, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
+                val measuring = state.beatIndex >= state.countInBeats
+                val almostReady = state.beatIndex == state.countInBeats - 1
                 TapPad(
-                    enabled = true,
-                    label = "跟着 click 敲",
+                    // Accept input on the last prep beat (still gray); yellow only once measuring.
+                    enabled = measuring || almostReady,
+                    highlighted = measuring,
+                    label = when {
+                        state.beatIndex < 0 || state.beatIndex < state.countInBeats - 1 ->
+                            "先听预备拍…"
+                        almostReady -> "下一拍开始敲"
+                        else -> "跟着 click 敲"
+                    },
                     onTap = viewModel::onTap
                 )
                 Spacer(Modifier.height(8.dp))

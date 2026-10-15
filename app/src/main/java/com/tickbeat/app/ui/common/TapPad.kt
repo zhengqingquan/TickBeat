@@ -23,9 +23,11 @@ fun TapPad(
     enabled: Boolean,
     label: String = "点击打拍",
     onTap: (eventTimeMs: Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Yellow/accent fill when true; defaults to [enabled]. Use to accept taps while staying gray. */
+    highlighted: Boolean = enabled
 ) {
-    val bg = if (enabled) {
+    val bg = if (highlighted) {
         MaterialTheme.colorScheme.secondary
     } else {
         MaterialTheme.colorScheme.surfaceVariant
@@ -49,7 +51,7 @@ fun TapPad(
             text = label,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            color = if (enabled) {
+            color = if (highlighted) {
                 MaterialTheme.colorScheme.onSecondary
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant

@@ -22,8 +22,14 @@ data class LatencyUiState(
     val phase: LatencyPhase = LatencyPhase.Idle,
     val measuredMs: Int? = null,
     val matchedTaps: Int = 0,
-    val beatIndex: Int = -1
-)
+    /** Absolute beat index in the full map (count-in + measure), or -1 before first click. */
+    val beatIndex: Int = -1,
+    val countInBeats: Int = LatencySettingsViewModel.COUNT_IN_BEATS,
+    val measureBeats: Int = LatencySettingsViewModel.MEASURE_BEATS
+) {
+    val inCountIn: Boolean
+        get() = beatIndex < countInBeats
+}
 
 class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val timing = TimingPreferences.get(app)
@@ -33,14 +39,15 @@ class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
     val ui: StateFlow<LatencyUiState> = _ui.asStateFlow()
 
     private val taps = mutableListOf<Long>()
-    private var expectedAudible = listOf<Long>()
+    private var expectedMeasure = listOf<Long>()
 
+    /** 4 count-in + 8 measure = 3 bars at 4/4. */
     private val calibrateMap = BeatmapFactory.steadyQuarters(
-        id = "latency_calibrate_100_8",
+        id = "latency_calibrate_100_countin",
         title = "延迟校准",
         bpm = 100,
         beatsPerBar = 4,
-        bars = 2,
+        bars = (COUNT_IN_BEATS + MEASURE_BEATS) / 4,
         tags = emptySet()
     )
 
@@ -49,7 +56,8 @@ class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
             _ui.update { it.copy(beatIndex = index) }
         }
         engine.onStarted = { origin ->
-            expectedAudible = calibrateMap.expectedTimesMs(origin)
+            val all = calibrateMap.expectedTimesMs(origin)
+            expectedMeasure = all.drop(COUNT_IN_BEATS)
         }
         engine.onCompleted = {
             finishCalibration()
@@ -69,7 +77,7 @@ class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startCalibration() {
         taps.clear()
-        expectedAudible = emptyList()
+        expectedMeasure = emptyList()
         _ui.update {
             it.copy(
                 phase = LatencyPhase.Calibrating,
@@ -83,6 +91,9 @@ class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onTap(eventTimeMs: Long) {
         if (_ui.value.phase != LatencyPhase.Calibrating) return
+        // Accept from the last count-in beat so the first measure tap isn't lost while the pad unlocks.
+        // Early taps still won't match measure expects (one beat ≈ 600ms > match window).
+        if (_ui.value.beatIndex < COUNT_IN_BEATS - 1) return
         taps.add(eventTimeMs)
     }
 
@@ -110,8 +121,8 @@ class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun finishCalibration() {
         if (_ui.value.phase != LatencyPhase.Calibrating) return
-        val expected = expectedAudible.ifEmpty {
-            calibrateMap.expectedTimesMs(engine.audibleOriginUptimeMs)
+        val expected = expectedMeasure.ifEmpty {
+            calibrateMap.expectedTimesMs(engine.audibleOriginUptimeMs).drop(COUNT_IN_BEATS)
         }
         val errors = matchErrors(expected, taps)
         val median = medianOrNull(errors)
@@ -173,6 +184,8 @@ class LatencySettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
+        const val COUNT_IN_BEATS = 4
+        const val MEASURE_BEATS = 8
         private const val MATCH_WINDOW_MS = TimingPreferences.MAX_OFFSET.toLong()
     }
 }

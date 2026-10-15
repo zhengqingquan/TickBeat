@@ -21,6 +21,8 @@ class RhythmPlaybackEngine {
     companion object {
         private const val SAMPLE_RATE = 44_100
         private const val CLICK_MS = 12
+        /** Extra time after the last click is audible so the final tap can still register. */
+        private const val COMPLETION_GRACE_MS = 450L
     }
 
     private val playing = AtomicBoolean(false)
@@ -104,6 +106,7 @@ class RhythmPlaybackEngine {
             }.sortedBy { it.second }
 
             var next = 0
+            var lastAudibleAt = audibleOriginUptimeMs
             while (playing.get() && generation.get() == gen && next < schedule.size) {
                 val (index, sampleAt, accent) = schedule[next]
                 val need = (sampleAt - samplesWritten).coerceAtLeast(0)
@@ -118,6 +121,7 @@ class RhythmPlaybackEngine {
 
                 val click = if (accent) accentClick else normalClick
                 val audibleAt = audibleOriginUptimeMs + (sampleAt * 1000L / SAMPLE_RATE)
+                lastAudibleAt = audibleAt
                 mainHandler.postAtTime(
                     {
                         if (generation.get() == gen) onEventAudible?.invoke(index, audibleAt)
@@ -146,10 +150,21 @@ class RhythmPlaybackEngine {
                     writeFully(audioTrack, silence)
                 }
             }
+            // Finish only after the last click is audible (+ grace), not when the write loop ends —
+            // otherwise the final tap is almost always dropped (e.g. calibration matches 7/8).
             if (generation.get() == gen) {
-                mainHandler.post { onCompleted?.invoke() }
+                val completeAt = lastAudibleAt + COMPLETION_GRACE_MS
+                mainHandler.postAtTime(
+                    {
+                        if (generation.get() != gen) return@postAtTime
+                        playing.set(false)
+                        onCompleted?.invoke()
+                    },
+                    completeAt
+                )
+            } else {
+                playing.set(false)
             }
-            playing.set(false)
         }, "RhythmPlayback").also {
             it.isDaemon = true
             it.start()
