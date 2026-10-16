@@ -96,7 +96,8 @@
 
       // Prefer real CSS width of the WebView; Android must pass dp, not physical px.
       var w = containerWidth(staffWidth || maxWidth);
-      var h = 220;
+      // Compact height: staff + stems/accents without large empty bands.
+      var h = 120;
 
       var paper = document.getElementById("paper");
       paper.innerHTML = "";
@@ -121,9 +122,9 @@
       context.setStrokeStyle(fg || "#1A1A1A");
 
       var marginL = 4;
-      var marginR = 8;
+      var marginR = 16;
       var staveW = Math.max(120, w - marginL - marginR);
-      var stave = new VF.Stave(marginL, 40, staveW);
+      var stave = new VF.Stave(marginL, 10, staveW);
       stave.addTimeSignature(beatsPerBar + "/" + noteValue);
       stave.setContext(context).draw();
 
@@ -180,11 +181,14 @@
       }).setMode(VF.Voice.Mode.SOFT);
       voice.addTickables(tickables);
 
-      // Pack notes into the stave's note area (not full stave width).
+      // Pack notes into the stave's note area; leave gaps after time sig and before stave end.
       var formatter = new VF.Formatter();
       formatter.joinVoices([voice]);
-      var noteStart = stave.getNoteStartX();
-      var noteEnd = stave.getNoteEndX();
+      var padAfterTimeSig = 20;
+      var padBeforeEnd = 28;
+      var noteStart = stave.getNoteStartX() + padAfterTimeSig;
+      stave.setNoteStartX(noteStart);
+      var noteEnd = stave.getNoteEndX() - padBeforeEnd;
       var available = Math.max(40, noteEnd - noteStart);
       try {
         formatter.format([voice], available, { softmaxFactor: 10 });

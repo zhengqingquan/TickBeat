@@ -72,7 +72,7 @@ fun VexRhythmView(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(300.dp)
+            .height(140.dp)
             .onSizeChanged { size ->
                 if (size.width > 0) {
                     val dp = with(density) { size.width.toDp().value.toInt() }
@@ -83,7 +83,7 @@ fun VexRhythmView(
         AndroidView(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp),
+                .height(140.dp),
             factory = { context ->
                 val host = VexHost().apply {
                     pendingScore = scoreJson

@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -63,7 +65,7 @@ fun ImitateScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
         if (map != null) {
             VexRhythmView(
                 beatmap = map,
@@ -72,7 +74,7 @@ fun ImitateScreen(
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(4.dp))
         Text(
             text = when (state.phase) {
                 ImitatePhase.Pick -> "先听示范，再按记忆复打（比相对节奏）"
@@ -83,7 +85,7 @@ fun ImitateScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
         TapPad(
             enabled = state.phase == ImitatePhase.Record,
             label = if (state.phase == ImitatePhase.Record) "复打此处" else "等待复打阶段",
@@ -93,15 +95,25 @@ fun ImitateScreen(
         Spacer(Modifier.height(12.dp))
         when (state.phase) {
             ImitatePhase.Pick, ImitatePhase.Result -> {
-                TextButton(onClick = viewModel::startDemo) { Text("开始") }
+                Button(
+                    onClick = viewModel::startDemo,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text("开始")
+                }
             }
             ImitatePhase.Demo, ImitatePhase.Record -> {
-                TextButton(onClick = viewModel::stop) { Text("停止") }
+                OutlinedButton(onClick = viewModel::stop) {
+                    Text("停止")
+                }
             }
         }
 
         state.score?.let {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             ScoreReportCard(score = it, onRetry = viewModel::startDemo)
         }
     }
