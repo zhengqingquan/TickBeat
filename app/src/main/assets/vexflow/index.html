@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <script src="vexflow.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    #paper {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    #paper svg {
+      display: block;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="paper"></div>
+  </div>
+  <script>
+    var eventBeats = [];
+    var noteEls = [];
+    var durationBeats = 1;
+    var ready = false;
+    var drawnNotes = [];
+    var fitScale = 1;
+    var baseFg = "#1A1A1A";
+    var hasGrades = false;
+    var activeIndex = -1;
+    var HIGHLIGHT = "#FF8F00";
+    var PAST = "#90A4AE";
+
+    function containerWidth(fallback) {
+      var wrap = document.getElementById("wrap");
+      var cw = wrap ? wrap.clientWidth : 0;
+      if (cw > 0) return cw;
+      var iw = window.innerWidth || document.documentElement.clientWidth || 0;
+      if (iw > 0) return iw;
+      return Math.max(200, fallback || 360);
+    }
+
+    function paintNote(el, fill) {
+      if (!el || !fill) return;
+      el.querySelectorAll("path, rect").forEach(function (p) {
+        p.style.fill = fill;
+        p.setAttribute("fill", fill);
+        p.style.stroke = fill;
+        p.setAttribute("stroke", fill);
+      });
+    }
+
+    function paintProgress(active) {
+      noteEls.forEach(function (el, i) {
+        if (active < 0) paintNote(el, baseFg);
+        else if (i === active) paintNote(el, HIGHLIGHT);
+        else if (i < active) paintNote(el, PAST);
+        else paintNote(el, baseFg);
+      });
+    }
+
+    /** Index of the note sounding at [beat] (last attack at or before beat). */
+    function activeNoteIndex(beat) {
+      if (!eventBeats.length || !noteEls.length) return -1;
+      if (beat < eventBeats[0]) return -1;
+      var i = 0;
+      while (i + 1 < eventBeats.length && eventBeats[i + 1] <= beat) i++;
+      return Math.min(i, noteEls.length - 1);
+    }
+
+    function renderScore(scoreJson, beats, duration, fg, staffWidth, maxWidth) {
+      eventBeats = beats || [];
+      durationBeats = Math.max(1, duration || 1);
+      drawnNotes = [];
+      fitScale = 1;
+      ready = false;
+      hasGrades = false;
+      activeIndex = -1;
+      baseFg = fg || "#1A1A1A";
+
+      // Prefer real CSS width of the WebView; Android must pass dp, not physical px.
+      var w = containerWidth(staffWidth || maxWidth);
+      var h = 220;
+
+      var paper = document.getElementById("paper");
+      paper.innerHTML = "";
+      paper.style.width = "100%";
+      paper.style.height = h + "px";
+
+      var VF = (window.Vex && window.Vex.Flow) ? window.Vex.Flow : window.VexFlow;
+      if (!VF) {
+        console.error("VexFlow not loaded");
+        return 0;
+      }
+
+      var score = typeof scoreJson === "string" ? JSON.parse(scoreJson) : scoreJson;
+      var notesSpec = score.notes || [];
+      var beatsPerBar = score.beatsPerBar || 4;
+      var noteValue = score.noteValue || 4;
+
+      var renderer = new VF.Renderer(paper, VF.Renderer.Backends.SVG);
+      renderer.resize(w, h);
+      var context = renderer.getContext();
+      context.setFillStyle(fg || "#1A1A1A");
+      context.setStrokeStyle(fg || "#1A1A1A");
+
+      var marginL = 4;
+      var marginR = 8;
+      var staveW = Math.max(120, w - marginL - marginR);
+      var stave = new VF.Stave(marginL, 40, staveW);
+      stave.addTimeSignature(beatsPerBar + "/" + noteValue);
+      stave.setContext(context).draw();
+
+      var tickables = [];
+      notesSpec.forEach(function (spec) {
+        var dur = spec.dur || "q";
+        var isRest = !!spec.rest || /r$/.test(dur);
+        var note;
+        if (isRest) {
+          note = new VF.StaveNote({
+            keys: ["b/4"],
+            duration: dur.indexOf("r") >= 0 ? dur : (dur + "r"),
+            clef: "treble"
+          });
+        } else {
+          var clean = dur.replace("d", "");
+          var dotted = dur.indexOf("d") >= 0;
+          note = new VF.StaveNote({
+            keys: ["b/4"],
+            duration: clean,
+            clef: "treble",
+            stem_direction: VF.Stem.UP
+          });
+          if (dotted) {
+            VF.Dot.buildAndAttach([note], { all: true });
+          }
+          if (spec.accent) {
+            var art = new VF.Articulation("a>").setPosition(VF.Modifier.Position.ABOVE);
+            note.addModifier(art, 0);
+          }
+        }
+        tickables.push(note);
+        if (!isRest) drawnNotes.push({ note: note, tBeat: spec.tBeat });
+      });
+
+      function isRestNote(n) {
+        if (typeof n.isRest === "function") return n.isRest();
+        if (typeof n.isRest === "boolean") return n.isRest;
+        return n.noteType === "r";
+      }
+
+      var beams = [];
+      try {
+        beams = VF.Beam.generateBeams(
+          tickables.filter(function (n) { return !isRestNote(n); })
+        );
+      } catch (e) {
+        beams = [];
+      }
+
+      var voice = new VF.Voice({
+        numBeats: beatsPerBar,
+        beatValue: noteValue
+      }).setMode(VF.Voice.Mode.SOFT);
+      voice.addTickables(tickables);
+
+      // Pack notes into the stave's note area (not full stave width).
+      var formatter = new VF.Formatter();
+      formatter.joinVoices([voice]);
+      var noteStart = stave.getNoteStartX();
+      var noteEnd = stave.getNoteEndX();
+      var available = Math.max(40, noteEnd - noteStart);
+      try {
+        formatter.format([voice], available, { softmaxFactor: 10 });
+      } catch (e) {
+        formatter.formatToStave([voice], stave);
+      }
+
+      voice.draw(context, stave);
+      beams.forEach(function (b) {
+        b.setContext(context).draw();
+      });
+
+      // If glyphs still spill past the canvas, shrink SVG to fit.
+      var svg = paper.querySelector("svg");
+      if (svg) {
+        var contentRight = 0;
+        try {
+          var bbox = svg.getBBox();
+          contentRight = bbox.x + bbox.width;
+        } catch (e) {
+          contentRight = w;
+        }
+        drawnNotes.forEach(function (d) {
+          try {
+            var ax = d.note.getAbsoluteX ? d.note.getAbsoluteX() : 0;
+            if (ax > contentRight) contentRight = ax + 24;
+          } catch (e2) {}
+        });
+        if (contentRight > w + 1) {
+          fitScale = w / contentRight;
+          svg.setAttribute("viewBox", "0 0 " + contentRight + " " + h);
+          svg.setAttribute("width", String(w));
+          svg.setAttribute("height", String(Math.round(h * fitScale)));
+          svg.style.width = "100%";
+          svg.style.height = "auto";
+        } else {
+          fitScale = 1;
+          svg.setAttribute("width", String(w));
+          svg.style.width = "100%";
+        }
+      }
+
+      noteEls = Array.from(paper.querySelectorAll(".vf-stavenote")).filter(function (el) {
+        return !el.classList.contains("vf-rest") && !el.querySelector(".vf-rest");
+      });
+      ready = true;
+
+      if (window.TickBeat) {
+        if (window.TickBeat.onRendered) window.TickBeat.onRendered(drawnNotes.length);
+        if (window.TickBeat.onLayout) {
+          window.TickBeat.onLayout(
+            w,
+            Math.round(available),
+            svg ? Math.round(svg.getBoundingClientRect().width) : -1
+          );
+        }
+      }
+      return 1;
+    }
+
+    function setHighlight(beat) {
+      if (!ready || hasGrades) return;
+      if (beat == null || beat < 0 || !eventBeats.length) {
+        if (activeIndex !== -1) {
+          activeIndex = -1;
+          paintProgress(-1);
+        }
+        return;
+      }
+      var b = Math.max(0, Math.min(durationBeats, beat));
+      var idx = activeNoteIndex(b);
+      if (idx === activeIndex) return;
+      activeIndex = idx;
+      paintProgress(idx);
+    }
+
+    function colorNotes(grades) {
+      hasGrades = true;
+      activeIndex = -1;
+      grades = grades || [];
+      noteEls.forEach(function (el, i) {
+        var g = grades[i];
+        var fill = baseFg;
+        if (g === "perfect") fill = "#2E7D32";
+        else if (g === "good") fill = "#F9A825";
+        else if (g === "miss") fill = "#C62828";
+        paintNote(el, fill);
+      });
+    }
+
+    function clearHighlight() {
+      if (hasGrades) return;
+      if (activeIndex === -1) return;
+      activeIndex = -1;
+      paintProgress(-1);
+    }
+  </script>
+</body>
+</html>

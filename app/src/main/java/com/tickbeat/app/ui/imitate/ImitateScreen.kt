@@ -23,7 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tickbeat.app.ui.common.RhythmTimeline
+import com.tickbeat.app.ui.common.VexRhythmView
 import com.tickbeat.app.ui.common.ScoreReportCard
 import com.tickbeat.app.ui.common.TapPad
 
@@ -65,7 +65,7 @@ fun ImitateScreen(
 
         Spacer(Modifier.height(16.dp))
         if (map != null) {
-            RhythmTimeline(
+            VexRhythmView(
                 beatmap = map,
                 playheadBeat = state.playheadBeat,
                 score = state.score
@@ -75,9 +75,9 @@ fun ImitateScreen(
         Spacer(Modifier.height(12.dp))
         Text(
             text = when (state.phase) {
-                ImitatePhase.Pick -> "先听示范，再复打"
+                ImitatePhase.Pick -> "先听示范，再按记忆复打（比相对节奏）"
                 ImitatePhase.Demo -> "示范中（${state.demoPass + 1}/2）"
-                ImitatePhase.Record -> "请复打！"
+                ImitatePhase.Record -> "请复打（速度可略有出入，比节奏型）"
                 ImitatePhase.Result -> "结果"
             },
             color = MaterialTheme.colorScheme.onSurfaceVariant
