@@ -181,20 +181,36 @@
       }).setMode(VF.Voice.Mode.SOFT);
       voice.addTickables(tickables);
 
-      // Pack notes into the stave's note area; leave gaps after time sig and before stave end.
+      // Leave a modest gap after time sig / before stave end; place by attack time.
       var formatter = new VF.Formatter();
       formatter.joinVoices([voice]);
-      var padAfterTimeSig = 20;
-      var padBeforeEnd = 28;
+      var padAfterTimeSig = 12;
+      var padBeforeEnd = 16;
       var noteStart = stave.getNoteStartX() + padAfterTimeSig;
       stave.setNoteStartX(noteStart);
       var noteEnd = stave.getNoteEndX() - padBeforeEnd;
       var available = Math.max(40, noteEnd - noteStart);
       try {
-        formatter.format([voice], available, { softmaxFactor: 10 });
+        // Creates tick contexts / metrics; positions are overridden below.
+        formatter.format([voice], available, { softmaxFactor: 100 });
       } catch (e) {
         formatter.formatToStave([voice], stave);
       }
+
+      // Place each attack at its beat within the bar (start of its timeslot).
+      // The space after the last note is that note's duration — e.g. 4 quarters
+      // sit at 0/25/50/75%, not stretched to the right edge.
+      var barBeats = beatsPerBar > 0 ? beatsPerBar : 4;
+      var usable = available;
+      tickables.forEach(function (note, i) {
+        var spec = notesSpec[i] || {};
+        var t = typeof spec.tBeat === "number" ? spec.tBeat : 0;
+        var frac = t / barBeats;
+        if (frac < 0) frac = 0;
+        if (frac > 1) frac = 1;
+        var tc = note.getTickContext && note.getTickContext();
+        if (tc && tc.setX) tc.setX(frac * usable);
+      });
 
       voice.draw(context, stave);
       beams.forEach(function (b) {
