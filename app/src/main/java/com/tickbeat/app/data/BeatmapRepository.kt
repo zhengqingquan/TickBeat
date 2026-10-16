@@ -111,7 +111,8 @@ class BeatmapRepository private constructor(private val context: Context) {
             beatsPerBar = 4,
             difficulty = 2,
             tags = setOf("imitate", "sightread", "ear"),
-            beats = (0..7).map { (it * 0.5) to (it % 2 == 0 && it % 4 == 0) }
+            // One bar: 8 eighths, accents on beats 1 and 3 (t=0, 2)
+            beats = (0..7).map { i -> (i * 0.5) to (i % 4 == 0) }
         ),
         pattern(
             id = "imitate_rest",
@@ -120,6 +121,7 @@ class BeatmapRepository private constructor(private val context: Context) {
             beatsPerBar = 4,
             difficulty = 2,
             tags = setOf("imitate", "sightread", "ear"),
+            // One bar: ♩ ♩ 𝄽 ♩  (attack on 0,1,3 — beat 2 is rest)
             beats = listOf(0.0 to true, 1.0 to false, 3.0 to false)
         ),
         pattern(
@@ -129,6 +131,7 @@ class BeatmapRepository private constructor(private val context: Context) {
             beatsPerBar = 4,
             difficulty = 3,
             tags = setOf("imitate", "sightread", "ear"),
+            // One bar: ♩. syncopation 0 · 0.5 · 1.5 · 2 · 3
             beats = listOf(0.0 to true, 0.5 to false, 1.5 to false, 2.0 to false, 3.0 to false)
         ),
         pattern(
@@ -138,19 +141,18 @@ class BeatmapRepository private constructor(private val context: Context) {
             beatsPerBar = 4,
             difficulty = 3,
             tags = setOf("imitate", "sightread", "ear"),
+            // One bar: ♩. ♪ ♩ ♩
             beats = listOf(0.0 to true, 1.5 to false, 2.0 to false, 3.0 to false)
         ),
         pattern(
-            id = "sight_two_bars_eighth",
-            title = "视奏 · 两小节八分",
+            id = "sight_one_bar_eighth",
+            title = "视奏 · 八分连续",
             bpm = 86,
             beatsPerBar = 4,
             difficulty = 2,
-            tags = setOf("sightread", "imitate"),
-            beats = (0..15).map { i ->
-                val t = i * 0.5
-                t to (i % 8 == 0)
-            }
+            tags = setOf("sightread"),
+            // One bar only (was two bars; imitate must stay single-bar)
+            beats = (0..7).map { i -> (i * 0.5) to (i % 4 == 0) }
         ),
         pattern(
             id = "ear_simple",
@@ -158,7 +160,7 @@ class BeatmapRepository private constructor(private val context: Context) {
             bpm = 100,
             beatsPerBar = 4,
             difficulty = 1,
-            tags = setOf("ear", "imitate"),
+            tags = setOf("ear"),
             beats = listOf(0.0 to true, 1.0 to false, 2.0 to false, 3.0 to false)
         )
     )

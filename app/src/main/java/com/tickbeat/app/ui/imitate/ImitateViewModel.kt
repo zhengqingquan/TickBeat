@@ -1,7 +1,9 @@
 package com.tickbeat.app.ui.imitate
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.tickbeat.app.audio.RhythmPlaybackEngine
 import com.tickbeat.app.data.BeatmapRepository
 import com.tickbeat.app.data.TimingPreferences
@@ -9,10 +11,14 @@ import com.tickbeat.app.domain.Beatmap
 import com.tickbeat.app.domain.Judge
 import com.tickbeat.app.domain.SessionScore
 import com.tickbeat.app.domain.applyInputOffset
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 enum class ImitatePhase {
     Pick,
@@ -39,26 +45,22 @@ class ImitateViewModel(app: Application) : AndroidViewModel(app) {
     val ui: StateFlow<ImitateUiState> = _ui.asStateFlow()
 
     private val taps = mutableListOf<Long>()
-    private var recordOrigin = 0L
     private var demoCountTarget = 2
+    private var playheadJob: Job? = null
 
     init {
         val maps = repo.byTag("imitate")
         _ui.update { it.copy(maps = maps, selected = maps.firstOrNull()) }
-        engine.onEventAudible = { index, _ ->
-            val map = _ui.value.selected
-            val t = map?.events?.getOrNull(index)?.tBeat
-            if (t != null) {
-                _ui.update { it.copy(playheadBeat = t) }
-            }
-        }
         engine.onCompleted = {
             when (_ui.value.phase) {
                 ImitatePhase.Demo -> {
                     val next = _ui.value.demoPass + 1
                     if (next < demoCountTarget) {
                         _ui.update { it.copy(demoPass = next) }
-                        _ui.value.selected?.let { engine.play(it) }
+                        _ui.value.selected?.let { map ->
+                            engine.play(map)
+                            startPlayhead(map)
+                        }
                     } else {
                         beginRecord()
                     }
@@ -77,35 +79,55 @@ class ImitateViewModel(app: Application) : AndroidViewModel(app) {
     fun startDemo() {
         val map = _ui.value.selected ?: return
         taps.clear()
+        playheadJob?.cancel()
         _ui.update {
             it.copy(phase = ImitatePhase.Demo, demoPass = 0, score = null, playheadBeat = 0.0)
         }
         engine.play(map)
+        startPlayhead(map)
     }
 
     private fun beginRecord() {
         val map = _ui.value.selected ?: return
         taps.clear()
-        recordOrigin = 0L
+        playheadJob?.cancel()
         _ui.update { it.copy(phase = ImitatePhase.Record, playheadBeat = 0.0) }
-        engine.onStarted = { origin -> recordOrigin = origin }
-        // Silent timeline of same length so user has a window.
+        // Silent timeline of same length so the playhead still guides pacing.
         engine.play(map, muted = true)
+        startPlayhead(map)
+    }
+
+    /** Smooth playhead from audible origin (same clock as clicks), not per-note jumps. */
+    private fun startPlayhead(map: Beatmap) {
+        playheadJob?.cancel()
+        playheadJob = viewModelScope.launch {
+            val beatMs = 60_000.0 / map.bpm.coerceAtLeast(1)
+            val endBeat = map.durationBeats.coerceAtLeast(0.0)
+            while (isActive) {
+                val phase = _ui.value.phase
+                if (phase != ImitatePhase.Demo && phase != ImitatePhase.Record) break
+                val origin = engine.audibleOriginUptimeMs
+                if (origin > 0L) {
+                    val elapsed = SystemClock.uptimeMillis() - origin
+                    val beat = (elapsed / beatMs).coerceIn(0.0, endBeat)
+                    _ui.update { it.copy(playheadBeat = beat) }
+                }
+                delay(16)
+            }
+        }
     }
 
     fun onTap(eventTimeMs: Long) {
         if (_ui.value.phase != ImitatePhase.Record) return
-        if (recordOrigin == 0L) {
-            recordOrigin = engine.audibleOriginUptimeMs
-        }
         taps.add(eventTimeMs)
     }
 
     private fun finishRecord() {
+        playheadJob?.cancel()
         val map = _ui.value.selected ?: return
-        val origin = engine.audibleOriginUptimeMs.takeIf { it > 0 } ?: recordOrigin
-        val expected = map.expectedTimesMs(origin)
-        val score = Judge.evaluate(
+        // Relative rhythm: first tap = first note, overall tempo stretch ignored.
+        val expected = map.expectedTimesMs(0L)
+        val score = Judge.evaluateRelative(
             expected,
             applyInputOffset(taps.toList(), timing.inputOffsetMs)
         )
@@ -113,12 +135,14 @@ class ImitateViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun stop() {
+        playheadJob?.cancel()
         engine.stop()
         if (_ui.value.phase == ImitatePhase.Record) finishRecord()
         else _ui.update { it.copy(phase = ImitatePhase.Pick, playheadBeat = null) }
     }
 
     override fun onCleared() {
+        playheadJob?.cancel()
         engine.stop()
         engine.onEventAudible = null
         engine.onStarted = null

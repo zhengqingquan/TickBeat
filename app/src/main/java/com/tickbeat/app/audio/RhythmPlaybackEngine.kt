@@ -144,16 +144,28 @@ class RhythmPlaybackEngine {
                 next++
             }
 
-            // Tail silence so the last click can leave the buffer.
-            if (playing.get() && generation.get() == gen) {
-                repeat(8) {
-                    writeFully(audioTrack, silence)
+            // Tail silence through the notated duration (last event + 1 beat), so the
+            // playhead / record window matches the written rhythm instead of cutting
+            // short right after the final click (which feels like the end “speeds up”).
+            val endSample = (
+                beatmap.durationBeats.coerceAtLeast(0.0) * beatMs * SAMPLE_RATE / 1000.0
+            ).toLong()
+            if (playing.get() && generation.get() == gen && endSample > samplesWritten) {
+                var remaining = endSample - samplesWritten
+                while (remaining > 0 && playing.get() && generation.get() == gen) {
+                    val n = min(silence.size.toLong(), remaining).toInt()
+                    writeFully(audioTrack, silence, n)
+                    samplesWritten += n
+                    remaining -= n
                 }
+            } else if (playing.get() && generation.get() == gen) {
+                repeat(8) { writeFully(audioTrack, silence) }
             }
-            // Finish only after the last click is audible (+ grace), not when the write loop ends —
-            // otherwise the final tap is almost always dropped (e.g. calibration matches 7/8).
+            // Finish after notated end (+ grace), not merely last click + grace.
             if (generation.get() == gen) {
-                val completeAt = lastAudibleAt + COMPLETION_GRACE_MS
+                val notatedEndAt = audibleOriginUptimeMs +
+                    (beatmap.durationBeats.coerceAtLeast(0.0) * beatMs).toLong()
+                val completeAt = maxOf(lastAudibleAt, notatedEndAt) + COMPLETION_GRACE_MS
                 mainHandler.postAtTime(
                     {
                         if (generation.get() != gen) return@postAtTime

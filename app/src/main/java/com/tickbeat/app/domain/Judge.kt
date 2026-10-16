@@ -40,6 +40,44 @@ object JudgeConfig {
 
 object Judge {
     /**
+     * Imitate mode: judge **relative rhythm**, not wall-clock tempo.
+     * Aligns the first tap to the first expected note, then linearly stretches the
+     * tap timeline so its span matches the expected span (ignores overall speed),
+     * then runs the same windows as [evaluate].
+     *
+     * This avoids the common feel that “the end gets faster” when the player is
+     * slightly slow under absolute timing.
+     */
+    fun evaluateRelative(
+        expectedMs: List<Long>,
+        tapMs: List<Long>,
+        perfectWindowMs: Long = JudgeConfig.PerfectWindowMs,
+        goodWindowMs: Long = JudgeConfig.GoodWindowMs
+    ): SessionScore {
+        if (expectedMs.isEmpty()) {
+            return evaluate(expectedMs, tapMs, perfectWindowMs, goodWindowMs)
+        }
+        if (tapMs.isEmpty()) {
+            return evaluate(expectedMs, emptyList(), perfectWindowMs, goodWindowMs)
+        }
+
+        val e0 = expectedMs.first()
+        val eRel = expectedMs.map { it - e0 }
+        val t0 = tapMs.first()
+        val tRel = tapMs.map { it - t0 }
+
+        val eSpan = (eRel.lastOrNull() ?: 0L).toDouble().coerceAtLeast(1.0)
+        // Prefer span covering the first N taps (N = expected count) so trailing
+        // extra taps don't warp tempo; fall back to full span if fewer taps.
+        val spanTapIdx = (expectedMs.size - 1).coerceIn(0, tRel.lastIndex)
+        val tSpan = tRel[spanTapIdx].toDouble().coerceAtLeast(1.0)
+        val scale = eSpan / tSpan
+        val tapScaled = tRel.map { (it * scale).toLong() }
+
+        return evaluate(eRel, tapScaled, perfectWindowMs, goodWindowMs)
+    }
+
+    /**
      * Greedy nearest-tap matching within [JudgeConfig.GoodWindowMs].
      * Extra taps are ignored; unmatched expectations become Miss.
      */
