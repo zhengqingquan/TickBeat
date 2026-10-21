@@ -3,6 +3,7 @@ package com.tickbeat.app.ui.interval
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.tickbeat.app.audio.TonePlaybackEngine
+import com.tickbeat.app.domain.IntervalQuality
 import com.tickbeat.app.domain.IntervalQuestion
 import com.tickbeat.app.domain.IntervalQuestionFactory
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,9 @@ data class IntervalUiState(
     val correct: Boolean? = null,
     val streak: Int = 0,
     val answeredCount: Int = 0,
-    val correctCount: Int = 0
+    val correctCount: Int = 0,
+    /** Multi-select question pool; at least one must stay selected. */
+    val qualities: Set<IntervalQuality> = IntervalQuality.entries.toSet()
 )
 
 class IntervalViewModel(app: Application) : AndroidViewModel(app) {
@@ -33,10 +36,25 @@ class IntervalViewModel(app: Application) : AndroidViewModel(app) {
         nextQuestion(playRoot = true)
     }
 
+    fun toggleQuality(quality: IntervalQuality) {
+        val current = _ui.value.qualities
+        val next = if (quality in current) {
+            if (current.size <= 1) return // keep at least one
+            current - quality
+        } else {
+            current + quality
+        }
+        _ui.update { it.copy(qualities = next) }
+        nextQuestion(playRoot = true)
+    }
+
     fun nextQuestion(playRoot: Boolean = true) {
         engine.stop()
         round++
-        val q = IntervalQuestionFactory.random(seed = round * 31 + 7)
+        val q = IntervalQuestionFactory.random(
+            seed = round * 31 + 7,
+            qualities = _ui.value.qualities
+        )
         _ui.update {
             it.copy(
                 question = q,

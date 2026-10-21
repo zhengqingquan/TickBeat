@@ -1,6 +1,9 @@
 package com.tickbeat.app.ui.interval
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -20,9 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tickbeat.app.domain.IntervalQuality
 import com.tickbeat.app.domain.IntervalQuestionFactory
 import com.tickbeat.app.ui.common.PianoKeyboard
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun IntervalScreen(
     viewModel: IntervalViewModel = viewModel()
@@ -44,6 +50,27 @@ fun IntervalScreen(
             text = "正确 ${state.correctCount}/${state.answeredCount} · 连对 ${state.streak}",
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "题目范围",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(4.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IntervalQuality.entries.forEach { quality ->
+                FilterChip(
+                    selected = quality in state.qualities,
+                    onClick = { viewModel.toggleQuality(quality) },
+                    label = { Text(quality.labelZh) }
+                )
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
         Text(
             text = q?.prompt ?: "暂无题目",

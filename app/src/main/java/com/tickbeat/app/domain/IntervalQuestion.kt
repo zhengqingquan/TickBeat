@@ -1,51 +1,63 @@
 package com.tickbeat.app.domain
 
+/** User-facing filter buckets for interval drill. */
+enum class IntervalQuality(val labelZh: String) {
+    Perfect("纯"),
+    MajorMinor("大/小"),
+    AugDim("增/减"),
+    DoubleAugDim("倍增/倍减");
+}
+
 /**
  * Intervals practiced within one octave (keyboard answer = root + semitones).
  * 增减音程与大小/纯音程可能同半音距（等音），题干名称不同，用于辨名练习。
  */
-enum class MusicalInterval(val semitones: Int, val labelZh: String) {
+enum class MusicalInterval(
+    val semitones: Int,
+    val labelZh: String,
+    val quality: IntervalQuality
+) {
     // 自然音程：小/大/纯
-    Minor2(1, "小二度"),
-    Major2(2, "大二度"),
-    Minor3(3, "小三度"),
-    Major3(4, "大三度"),
-    Perfect4(5, "纯四度"),
-    Perfect5(7, "纯五度"),
-    Minor6(8, "小六度"),
-    Major6(9, "大六度"),
-    Minor7(10, "小七度"),
-    Major7(11, "大七度"),
-    Perfect8(12, "纯八度"),
+    Minor2(1, "小二度", IntervalQuality.MajorMinor),
+    Major2(2, "大二度", IntervalQuality.MajorMinor),
+    Minor3(3, "小三度", IntervalQuality.MajorMinor),
+    Major3(4, "大三度", IntervalQuality.MajorMinor),
+    Perfect4(5, "纯四度", IntervalQuality.Perfect),
+    Perfect5(7, "纯五度", IntervalQuality.Perfect),
+    Minor6(8, "小六度", IntervalQuality.MajorMinor),
+    Major6(9, "大六度", IntervalQuality.MajorMinor),
+    Minor7(10, "小七度", IntervalQuality.MajorMinor),
+    Major7(11, "大七度", IntervalQuality.MajorMinor),
+    Perfect8(12, "纯八度", IntervalQuality.Perfect),
 
     // 增减音程（含与上面等音者，如增四=减五=6）
-    Aug1(1, "增一度"),
-    Aug2(3, "增二度"),
-    Dim3(2, "减三度"),
-    Aug3(5, "增三度"),
-    Dim4(4, "减四度"),
-    Aug4(6, "增四度"),
-    Dim5(6, "减五度"),
-    Aug5(8, "增五度"),
-    Dim6(7, "减六度"),
-    Aug6(10, "增六度"),
-    Dim7(9, "减七度"),
-    Aug7(11, "增七度"),
-    Dim8(11, "减八度"),
+    Aug1(1, "增一度", IntervalQuality.AugDim),
+    Aug2(3, "增二度", IntervalQuality.AugDim),
+    Dim3(2, "减三度", IntervalQuality.AugDim),
+    Aug3(5, "增三度", IntervalQuality.AugDim),
+    Dim4(4, "减四度", IntervalQuality.AugDim),
+    Aug4(6, "增四度", IntervalQuality.AugDim),
+    Dim5(6, "减五度", IntervalQuality.AugDim),
+    Aug5(8, "增五度", IntervalQuality.AugDim),
+    Dim6(7, "减六度", IntervalQuality.AugDim),
+    Aug6(10, "增六度", IntervalQuality.AugDim),
+    Dim7(9, "减七度", IntervalQuality.AugDim),
+    Aug7(11, "增七度", IntervalQuality.AugDim),
+    Dim8(11, "减八度", IntervalQuality.AugDim),
 
     // 倍增 / 倍减（半音距 1–12；倍增七/八超出单八度，不收录）
-    DAug1(2, "倍增一度"),
-    DAug2(4, "倍增二度"),
-    DDim3(1, "倍减三度"),
-    DAug3(6, "倍增三度"),
-    DDim4(3, "倍减四度"),
-    DAug4(7, "倍增四度"),
-    DDim5(5, "倍减五度"),
-    DAug5(9, "倍增五度"),
-    DDim6(6, "倍减六度"),
-    DAug6(11, "倍增六度"),
-    DDim7(8, "倍减七度"),
-    DDim8(10, "倍减八度");
+    DAug1(2, "倍增一度", IntervalQuality.DoubleAugDim),
+    DAug2(4, "倍增二度", IntervalQuality.DoubleAugDim),
+    DDim3(1, "倍减三度", IntervalQuality.DoubleAugDim),
+    DAug3(6, "倍增三度", IntervalQuality.DoubleAugDim),
+    DDim4(3, "倍减四度", IntervalQuality.DoubleAugDim),
+    DAug4(7, "倍增四度", IntervalQuality.DoubleAugDim),
+    DDim5(5, "倍减五度", IntervalQuality.DoubleAugDim),
+    DAug5(9, "倍增五度", IntervalQuality.DoubleAugDim),
+    DDim6(6, "倍减六度", IntervalQuality.DoubleAugDim),
+    DAug6(11, "倍增六度", IntervalQuality.DoubleAugDim),
+    DDim7(8, "倍减七度", IntervalQuality.DoubleAugDim),
+    DDim8(10, "倍减八度", IntervalQuality.DoubleAugDim);
 }
 
 data class IntervalQuestion(
@@ -72,11 +84,12 @@ object IntervalQuestionFactory {
         return "$name$octave"
     }
 
-    fun random(seed: Int): IntervalQuestion {
-        val rnd = kotlin.random.Random(seed)
-        val candidates = buildList {
+    fun candidates(qualities: Set<IntervalQuality>): List<IntervalQuestion> {
+        val allowed = qualities.ifEmpty { IntervalQuality.entries.toSet() }
+        return buildList {
             for (root in IntervalRange.LOW_MIDI until IntervalRange.HIGH_MIDI) {
                 for (interval in MusicalInterval.entries) {
+                    if (interval.quality !in allowed) continue
                     val answer = root + interval.semitones
                     if (answer in IntervalRange.LOW_MIDI..IntervalRange.HIGH_MIDI) {
                         add(IntervalQuestion(root, interval))
@@ -84,7 +97,12 @@ object IntervalQuestionFactory {
                 }
             }
         }
-        require(candidates.isNotEmpty()) { "No legal interval questions in C4–C5" }
-        return candidates[rnd.nextInt(candidates.size)]
+    }
+
+    fun random(seed: Int, qualities: Set<IntervalQuality> = IntervalQuality.entries.toSet()): IntervalQuestion {
+        val rnd = kotlin.random.Random(seed)
+        val pool = candidates(qualities)
+        require(pool.isNotEmpty()) { "No legal interval questions for $qualities in C4–C5" }
+        return pool[rnd.nextInt(pool.size)]
     }
 }
