@@ -6,19 +6,24 @@ import android.media.AudioTrack
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.PI
+import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * Plays short pitched tones via AudioTrack (sine + AD envelope).
+ * Plays short pitched tones via AudioTrack.
+ * Additive harmonics + exponential decay — closer to piano than a pure sine.
  */
 class TonePlaybackEngine {
 
     companion object {
         private const val SAMPLE_RATE = 44_100
-        private const val DEFAULT_DURATION_MS = 450
-        private const val ATTACK_MS = 8
-        private const val RELEASE_MS = 60
+        private const val DEFAULT_DURATION_MS = 700
+        private const val ATTACK_MS = 4
+        /** Relative levels for partials 1..N (piano-ish bright attack, softer highs). */
+        private val HARMONIC_GAIN = doubleArrayOf(
+            1.00, 0.52, 0.32, 0.18, 0.12, 0.07, 0.04, 0.025
+        )
     }
 
     private val playing = AtomicBoolean(false)
@@ -32,7 +37,7 @@ class TonePlaybackEngine {
         playing.set(true)
         val gen = generation.incrementAndGet()
         val hz = midiToHz(midi)
-        val samples = synthesizeTone(hz, durationMs.coerceIn(80, 2_000))
+        val samples = synthesizePianoTone(hz, durationMs.coerceIn(80, 2_500))
 
         val minBuf = AudioTrack.getMinBufferSize(
             SAMPLE_RATE,
@@ -42,8 +47,8 @@ class TonePlaybackEngine {
         val audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_GAME)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
             )
             .setAudioFormat(
@@ -114,19 +119,33 @@ class TonePlaybackEngine {
     private fun midiToHz(midi: Int): Double =
         440.0 * 2.0.pow((midi - 69) / 12.0)
 
-    private fun synthesizeTone(hz: Double, durationMs: Int): ShortArray {
+    /**
+     * Additive synthesis: several decaying harmonics with a short hammer attack.
+     * Not a sampled piano, but much less "pure sine / electronic beep".
+     */
+    private fun synthesizePianoTone(hz: Double, durationMs: Int): ShortArray {
         val length = SAMPLE_RATE * durationMs / 1000
-        val attack = (SAMPLE_RATE * ATTACK_MS / 1000).coerceAtMost(length / 4)
-        val release = (SAMPLE_RATE * RELEASE_MS / 1000).coerceAtMost(length / 3)
+        val attack = (SAMPLE_RATE * ATTACK_MS / 1000).coerceAtMost(length / 8).coerceAtLeast(1)
+        // Slight stretch for higher partials (string inharmonicity).
+        val inharm = 0.0003
         val samples = ShortArray(length)
+        val twoPi = 2.0 * PI
+
         for (i in 0 until length) {
             val t = i.toDouble() / SAMPLE_RATE
-            val env = when {
-                i < attack -> i.toDouble() / attack
-                i > length - release -> (length - i).toDouble() / release
-                else -> 1.0
+            val attackEnv = if (i < attack) i.toDouble() / attack else 1.0
+            // Overall decay ~ piano sustain; higher partials die faster.
+            var mixed = 0.0
+            for (h in HARMONIC_GAIN.indices) {
+                val n = h + 1
+                val partialHz = hz * n * (1.0 + inharm * n * n)
+                val tau = 0.55 / (1.0 + 0.35 * (n - 1))
+                val harmEnv = exp(-t / tau)
+                mixed += HARMONIC_GAIN[h] * harmEnv * sin(twoPi * partialHz * t)
             }
-            samples[i] = (sin(2.0 * PI * hz * t) * env * Short.MAX_VALUE * 0.45).toInt().toShort()
+            // Soft clip into int16.
+            val sample = (mixed * attackEnv * 0.28).coerceIn(-1.0, 1.0)
+            samples[i] = (sample * Short.MAX_VALUE).toInt().toShort()
         }
         return samples
     }
