@@ -67,11 +67,13 @@ fun IntervalScreen(
         if (state.phase == IntervalPhase.Answered) {
             Spacer(Modifier.height(12.dp))
             val answerName = q?.let { IntervalQuestionFactory.midiName(it.answerMidi) }.orEmpty()
+            val semitones = q?.interval?.semitones
+            val semiLabel = semitones?.let { "（$it 个半音）" }.orEmpty()
             Text(
                 text = if (state.correct == true) {
-                    "回答正确"
+                    "回答正确 · $answerName$semiLabel"
                 } else {
-                    "再试：正解是 $answerName"
+                    "再试：正解是 $answerName$semiLabel"
                 },
                 color = if (state.correct == true) {
                     MaterialTheme.colorScheme.primary
