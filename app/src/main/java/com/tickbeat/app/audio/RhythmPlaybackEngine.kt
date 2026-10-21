@@ -51,8 +51,12 @@ class RhythmPlaybackEngine {
 
     fun isPlaying(): Boolean = playing.get()
 
+    /**
+     * @param muted if true, every click is silent (timeline still advances).
+     * @param muteFromBeat if set, clicks at/after this beat are silent (earlier ones audible).
+     */
     @Synchronized
-    fun play(beatmap: Beatmap, muted: Boolean = false) {
+    fun play(beatmap: Beatmap, muted: Boolean = false, muteFromBeat: Double? = null) {
         stop()
         if (beatmap.events.isEmpty()) {
             onCompleted?.invoke()
@@ -102,13 +106,13 @@ class RhythmPlaybackEngine {
 
             val schedule = beatmap.events.mapIndexed { index, event ->
                 val sampleAt = (event.tBeat * beatMs * SAMPLE_RATE / 1000.0).toLong()
-                Triple(index, sampleAt, event.accent)
+                Triple(index, sampleAt, event)
             }.sortedBy { it.second }
 
             var next = 0
             var lastAudibleAt = audibleOriginUptimeMs
             while (playing.get() && generation.get() == gen && next < schedule.size) {
-                val (index, sampleAt, accent) = schedule[next]
+                val (index, sampleAt, event) = schedule[next]
                 val need = (sampleAt - samplesWritten).coerceAtLeast(0)
                 var remaining = need
                 while (remaining > 0 && playing.get() && generation.get() == gen) {
@@ -119,7 +123,7 @@ class RhythmPlaybackEngine {
                 }
                 if (!playing.get() || generation.get() != gen) break
 
-                val click = if (accent) accentClick else normalClick
+                val click = if (event.accent) accentClick else normalClick
                 val audibleAt = audibleOriginUptimeMs + (sampleAt * 1000L / SAMPLE_RATE)
                 lastAudibleAt = audibleAt
                 mainHandler.postAtTime(
@@ -128,7 +132,9 @@ class RhythmPlaybackEngine {
                     },
                     audibleAt
                 )
-                if (!muted) {
+                val silentClick = muted ||
+                    (muteFromBeat != null && event.tBeat + 1e-9 >= muteFromBeat)
+                if (!silentClick) {
                     writeFully(audioTrack, click)
                     samplesWritten += click.size
                 } else {

@@ -27,6 +27,23 @@ data class Beatmap(
     }
 
     fun hasTag(tag: String): Boolean = tag in tags
+
+    /**
+     * Repeat this map across [bars] bars using [beatsPerBar] as the stride
+     * (not [durationBeats]), so back-to-back bars have no extra gap.
+     */
+    fun repeatAcrossBars(bars: Int): Beatmap {
+        val n = bars.coerceAtLeast(1)
+        if (n == 1) return this
+        val barLen = beatsPerBar.toDouble().coerceAtLeast(1.0)
+        val expanded = buildList {
+            for (pass in 0 until n) {
+                val offset = pass * barLen
+                for (e in events) add(e.copy(tBeat = e.tBeat + offset))
+            }
+        }
+        return copy(id = "${id}_x$n", events = expanded)
+    }
 }
 
 object BeatmapFactory {

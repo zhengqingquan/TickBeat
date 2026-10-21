@@ -47,25 +47,18 @@ class ImitateViewModel(app: Application) : AndroidViewModel(app) {
     private val taps = mutableListOf<Long>()
     private var demoCountTarget = 2
     private var playheadJob: Job? = null
+    /** Absolute beat where muted record bars begin (continuous session). */
+    private var recordFromBeat = 0.0
+    /** End of the last notated bar (exclusive). Past this, highlight must not wrap. */
+    private var contentEndBeat = 0.0
+    private var sessionEndBeat = 0.0
 
     init {
         val maps = repo.byTag("imitate")
         _ui.update { it.copy(maps = maps, selected = maps.firstOrNull()) }
         engine.onCompleted = {
             when (_ui.value.phase) {
-                ImitatePhase.Demo -> {
-                    val next = _ui.value.demoPass + 1
-                    if (next < demoCountTarget) {
-                        _ui.update { it.copy(demoPass = next) }
-                        _ui.value.selected?.let { map ->
-                            engine.play(map)
-                            startPlayhead(map)
-                        }
-                    } else {
-                        beginRecord()
-                    }
-                }
-                ImitatePhase.Record -> finishRecord()
+                ImitatePhase.Demo, ImitatePhase.Record -> finishRecord()
                 else -> Unit
             }
         }
@@ -80,37 +73,54 @@ class ImitateViewModel(app: Application) : AndroidViewModel(app) {
         val map = _ui.value.selected ?: return
         taps.clear()
         playheadJob?.cancel()
+
+        val barLen = map.beatsPerBar.toDouble().coerceAtLeast(1.0)
+        // Continuous: N audible demo bars + 1 silent record bar, one AudioTrack session.
+        val totalBars = demoCountTarget + 1
+        recordFromBeat = demoCountTarget * barLen
+        contentEndBeat = totalBars * barLen
+        val session = map.repeatAcrossBars(totalBars)
+        // Engine may run a short tail past the last bar; do not use that for highlight wrap.
+        sessionEndBeat = session.durationBeats.coerceAtLeast(contentEndBeat)
+
         _ui.update {
             it.copy(phase = ImitatePhase.Demo, demoPass = 0, score = null, playheadBeat = 0.0)
         }
-        engine.play(map)
-        startPlayhead(map)
+        engine.play(session, muteFromBeat = recordFromBeat)
+        startPlayhead(map, barLen)
     }
 
-    private fun beginRecord() {
-        val map = _ui.value.selected ?: return
-        taps.clear()
-        playheadJob?.cancel()
-        _ui.update { it.copy(phase = ImitatePhase.Record, playheadBeat = 0.0) }
-        // Silent timeline of same length so the playhead still guides pacing.
-        engine.play(map, muted = true)
-        startPlayhead(map)
-    }
-
-    /** Smooth playhead from audible origin (same clock as clicks), not per-note jumps. */
-    private fun startPlayhead(map: Beatmap) {
+    /** Smooth playhead; staff highlight uses beat within the written bar. */
+    private fun startPlayhead(map: Beatmap, barLen: Double) {
         playheadJob?.cancel()
         playheadJob = viewModelScope.launch {
             val beatMs = 60_000.0 / map.bpm.coerceAtLeast(1)
-            val endBeat = map.durationBeats.coerceAtLeast(0.0)
             while (isActive) {
                 val phase = _ui.value.phase
                 if (phase != ImitatePhase.Demo && phase != ImitatePhase.Record) break
                 val origin = engine.audibleOriginUptimeMs
                 if (origin > 0L) {
                     val elapsed = SystemClock.uptimeMillis() - origin
-                    val beat = (elapsed / beatMs).coerceIn(0.0, endBeat)
-                    _ui.update { it.copy(playheadBeat = beat) }
+                    val absBeat = (elapsed / beatMs).coerceIn(0.0, sessionEndBeat)
+                    val inRecord = absBeat + 1e-9 >= recordFromBeat
+                    // Tail after the last bar used to wrap via % and flash the rhythm again.
+                    val displayBeat = if (absBeat + 1e-9 >= contentEndBeat) {
+                        null
+                    } else {
+                        absBeat % barLen
+                    }
+                    val demoPass = if (inRecord) {
+                        demoCountTarget - 1
+                    } else {
+                        (absBeat / barLen).toInt().coerceIn(0, demoCountTarget - 1)
+                    }
+                    _ui.update {
+                        it.copy(
+                            phase = if (inRecord) ImitatePhase.Record else ImitatePhase.Demo,
+                            demoPass = demoPass,
+                            playheadBeat = displayBeat
+                        )
+                    }
                 }
                 delay(16)
             }
