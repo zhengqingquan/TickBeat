@@ -37,6 +37,8 @@
   <script>
     var eventBeats = [];
     var noteEls = [];
+    /** Parallel to noteEls: stem <g> for each note (beamed stems sit outside the note). */
+    var noteStemEls = [];
     var durationBeats = 1;
     var ready = false;
     var drawnNotes = [];
@@ -56,23 +58,134 @@
       return Math.max(200, fallback || 360);
     }
 
-    function paintNote(el, fill) {
-      if (!el || !fill) return;
-      el.querySelectorAll("path, rect").forEach(function (p) {
-        p.style.fill = fill;
-        p.setAttribute("fill", fill);
-        p.style.stroke = fill;
-        p.setAttribute("stroke", fill);
+    function paintShape(node, fill) {
+      if (!node || !fill) return;
+      // Stems are stroke-only paths (fill="none"); noteheads use fill.
+      node.style.stroke = fill;
+      node.setAttribute("stroke", fill);
+      if (node.getAttribute("fill") !== "none") {
+        node.style.fill = fill;
+        node.setAttribute("fill", fill);
+      }
+    }
+
+    function paintStemEl(stem, fill) {
+      if (!stem || !fill) return;
+      stem.querySelectorAll("path, rect, line, polygon").forEach(function (p) {
+        paintShape(p, fill);
+        // Keep stem visible: VexFlow uses a thin stroke path.
+        if (p.tagName.toLowerCase() === "path" && p.getAttribute("fill") === "none") {
+          var sw = parseFloat(p.getAttribute("stroke-width") || "1.5");
+          if (sw < 1.2) {
+            p.setAttribute("stroke-width", "1.5");
+            p.style.strokeWidth = "1.5";
+          }
+        }
       });
     }
 
-    function paintProgress(active) {
-      noteEls.forEach(function (el, i) {
-        if (active < 0) paintNote(el, baseFg);
-        else if (i === active) paintNote(el, HIGHLIGHT);
-        else if (i < active) paintNote(el, PAST);
-        else paintNote(el, baseFg);
+    /** Color notehead in the note group + its bound stem (may be outside for beams). */
+    function paintNoteIndex(i, fill) {
+      var el = noteEls[i];
+      if (!el || !fill) return;
+      // Noteheads only — skip nested stems here; beamed stems are not children anyway.
+      el.querySelectorAll(".vf-notehead path, .vf-notehead rect, .vf-notehead polygon").forEach(function (p) {
+        paintShape(p, fill);
       });
+      // Fallback if notehead class missing: all filled paths in the note (not stroke-only stems).
+      if (!el.querySelector(".vf-notehead")) {
+        el.querySelectorAll("path, rect, polygon").forEach(function (p) {
+          if (p.getAttribute("fill") === "none") return;
+          // Skip paths inside a stem group if any.
+          if (p.closest && p.closest(".vf-stem")) return;
+          paintShape(p, fill);
+        });
+      }
+      // Accent etc. above the note.
+      el.querySelectorAll(".vf-annotation path, .vf-articulation path").forEach(function (p) {
+        paintShape(p, fill);
+      });
+      paintStemEl(noteStemEls[i], fill);
+      // Non-beamed: stem lives inside the note group.
+      if (!noteStemEls[i]) {
+        el.querySelectorAll(".vf-stem").forEach(function (stem) {
+          paintStemEl(stem, fill);
+        });
+      }
+    }
+
+    function paintProgress(active) {
+      noteEls.forEach(function (_el, i) {
+        if (active < 0) paintNoteIndex(i, baseFg);
+        else if (i === active) paintNoteIndex(i, HIGHLIGHT);
+        else if (i < active) paintNoteIndex(i, PAST);
+        else paintNoteIndex(i, baseFg);
+      });
+    }
+
+    /**
+     * Beamed eighths: StaveNote skips drawStem; Beam.drawStems draws .vf-stem
+     * as siblings under SVG (not inside .vf-stavenote). Bind by stem X.
+     */
+    function bindNoteStems(paper) {
+      noteStemEls = [];
+      var stems = Array.from(paper.querySelectorAll(".vf-stem"));
+      var used = [];
+      drawnNotes.forEach(function (d, i) {
+        var noteEl = noteEls[i];
+        var inner = noteEl ? noteEl.querySelector(".vf-stem") : null;
+        if (inner) {
+          noteStemEls[i] = inner;
+          used.push(inner);
+          return;
+        }
+        noteStemEls[i] = null;
+        var targetX = null;
+        try {
+          var n = d.note;
+          if (n && typeof n.getStemX === "function") targetX = n.getStemX();
+          else if (n && typeof n.getAbsoluteX === "function") targetX = n.getAbsoluteX();
+        } catch (e) {}
+        if (targetX == null) return;
+        var best = null;
+        var bestDist = 1e9;
+        stems.forEach(function (stem) {
+          if (used.indexOf(stem) >= 0) return;
+          try {
+            var bb = stem.getBBox();
+            var cx = bb.x + bb.width / 2;
+            var dist = Math.abs(cx - targetX);
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = stem;
+            }
+          } catch (e2) {}
+        });
+        if (best && bestDist < 20) {
+          noteStemEls[i] = best;
+          used.push(best);
+        }
+      });
+      // Fallback: leftover stems ↔ unbound notes, both sorted by X.
+      var unbound = [];
+      for (var ui = 0; ui < noteStemEls.length; ui++) {
+        if (!noteStemEls[ui]) unbound.push(ui);
+      }
+      if (!unbound.length) return;
+      var leftover = stems.filter(function (s) { return used.indexOf(s) < 0; });
+      leftover.sort(function (a, b) {
+        try { return a.getBBox().x - b.getBBox().x; } catch (e) { return 0; }
+      });
+      unbound.sort(function (a, b) {
+        try {
+          var na = drawnNotes[a].note.getAbsoluteX();
+          var nb = drawnNotes[b].note.getAbsoluteX();
+          return na - nb;
+        } catch (e) { return a - b; }
+      });
+      for (var k = 0; k < unbound.length && k < leftover.length; k++) {
+        noteStemEls[unbound[k]] = leftover[k];
+      }
     }
 
     /** Index of the note sounding at [beat] (last attack at or before beat). */
@@ -250,6 +363,8 @@
       noteEls = Array.from(paper.querySelectorAll(".vf-stavenote")).filter(function (el) {
         return !el.classList.contains("vf-rest") && !el.querySelector(".vf-rest");
       });
+      bindNoteStems(paper);
+
       ready = true;
 
       if (window.TickBeat) {
@@ -285,13 +400,13 @@
       hasGrades = true;
       activeIndex = -1;
       grades = grades || [];
-      noteEls.forEach(function (el, i) {
+      noteEls.forEach(function (_el, i) {
         var g = grades[i];
         var fill = baseFg;
         if (g === "perfect") fill = "#2E7D32";
         else if (g === "good") fill = "#F9A825";
         else if (g === "miss") fill = "#C62828";
-        paintNote(el, fill);
+        paintNoteIndex(i, fill);
       });
     }
 
