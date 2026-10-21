@@ -69,6 +69,11 @@ fun IntervalScreen(
                     label = { Text(quality.labelZh) }
                 )
             }
+            FilterChip(
+                selected = state.allowAccidentals,
+                onClick = viewModel::toggleAccidentals,
+                label = { Text("升降号") }
+            )
         }
 
         Spacer(Modifier.height(12.dp))

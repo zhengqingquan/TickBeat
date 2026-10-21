@@ -22,7 +22,9 @@ data class IntervalUiState(
     val answeredCount: Int = 0,
     val correctCount: Int = 0,
     /** Multi-select question pool; at least one must stay selected. */
-    val qualities: Set<IntervalQuality> = IntervalQuality.entries.toSet()
+    val qualities: Set<IntervalQuality> = IntervalQuality.entries.toSet(),
+    /** When false, root and answer are white keys only (no #). */
+    val allowAccidentals: Boolean = true
 )
 
 class IntervalViewModel(app: Application) : AndroidViewModel(app) {
@@ -48,12 +50,19 @@ class IntervalViewModel(app: Application) : AndroidViewModel(app) {
         nextQuestion(playRoot = true)
     }
 
+    fun toggleAccidentals() {
+        _ui.update { it.copy(allowAccidentals = !it.allowAccidentals) }
+        nextQuestion(playRoot = true)
+    }
+
     fun nextQuestion(playRoot: Boolean = true) {
         engine.stop()
         round++
+        val state = _ui.value
         val q = IntervalQuestionFactory.random(
             seed = round * 31 + 7,
-            qualities = _ui.value.qualities
+            qualities = state.qualities,
+            allowAccidentals = state.allowAccidentals
         )
         _ui.update {
             it.copy(

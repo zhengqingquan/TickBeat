@@ -71,6 +71,12 @@ data class IntervalQuestion(
 object IntervalRange {
     const val LOW_MIDI = 60  // C4
     const val HIGH_MIDI = 72 // C5
+
+    /** Pitch classes with sharps on the keyboard (black keys). */
+    private val accidentalPcs = setOf(1, 3, 6, 8, 10)
+
+    fun hasAccidental(midi: Int): Boolean =
+        ((midi % 12) + 12) % 12 in accidentalPcs
 }
 
 object IntervalQuestionFactory {
@@ -84,25 +90,45 @@ object IntervalQuestionFactory {
         return "$name$octave"
     }
 
-    fun candidates(qualities: Set<IntervalQuality>): List<IntervalQuestion> {
+    /**
+     * @param allowAccidentals when false, both root and answer must be white keys.
+     */
+    fun candidates(
+        qualities: Set<IntervalQuality>,
+        allowAccidentals: Boolean = true
+    ): List<IntervalQuestion> {
         val allowed = qualities.ifEmpty { IntervalQuality.entries.toSet() }
         return buildList {
             for (root in IntervalRange.LOW_MIDI until IntervalRange.HIGH_MIDI) {
                 for (interval in MusicalInterval.entries) {
                     if (interval.quality !in allowed) continue
                     val answer = root + interval.semitones
-                    if (answer in IntervalRange.LOW_MIDI..IntervalRange.HIGH_MIDI) {
-                        add(IntervalQuestion(root, interval))
+                    if (answer !in IntervalRange.LOW_MIDI..IntervalRange.HIGH_MIDI) continue
+                    if (!allowAccidentals &&
+                        (IntervalRange.hasAccidental(root) || IntervalRange.hasAccidental(answer))
+                    ) {
+                        continue
                     }
+                    add(IntervalQuestion(root, interval))
                 }
             }
         }
     }
 
-    fun random(seed: Int, qualities: Set<IntervalQuality> = IntervalQuality.entries.toSet()): IntervalQuestion {
+    fun random(
+        seed: Int,
+        qualities: Set<IntervalQuality> = IntervalQuality.entries.toSet(),
+        allowAccidentals: Boolean = true
+    ): IntervalQuestion {
         val rnd = kotlin.random.Random(seed)
-        val pool = candidates(qualities)
-        require(pool.isNotEmpty()) { "No legal interval questions for $qualities in C4–C5" }
+        var pool = candidates(qualities, allowAccidentals)
+        // Rare combo with white keys only may be empty — fall back to allowing #.
+        if (pool.isEmpty() && !allowAccidentals) {
+            pool = candidates(qualities, allowAccidentals = true)
+        }
+        require(pool.isNotEmpty()) {
+            "No legal interval questions for $qualities accidentals=$allowAccidentals in C4–C5"
+        }
         return pool[rnd.nextInt(pool.size)]
     }
 }
