@@ -60,6 +60,11 @@ object Judge {
         if (tapMs.isEmpty()) {
             return evaluate(expectedMs, emptyList(), perfectWindowMs, goodWindowMs)
         }
+        // Need ≥2 taps to infer tempo stretch. A lone tap remapped to t=0 would
+        // always "hit" the first expected note — fall back to absolute matching.
+        if (tapMs.size < 2) {
+            return evaluate(expectedMs, tapMs, perfectWindowMs, goodWindowMs)
+        }
 
         val e0 = expectedMs.first()
         val eRel = expectedMs.map { it - e0 }

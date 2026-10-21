@@ -77,9 +77,9 @@ fun ImitateScreen(
         Spacer(Modifier.height(4.dp))
         Text(
             text = when (state.phase) {
-                ImitatePhase.Pick -> "连续听两遍示范，紧接着复打（比相对节奏）"
+                ImitatePhase.Pick -> "连续听两遍示范，紧接着按播放头复打"
                 ImitatePhase.Demo -> "示范中（${state.demoPass + 1}/2），随后连续复打"
-                ImitatePhase.Record -> "请复打（速度可略有出入，比节奏型）"
+                ImitatePhase.Record -> "请按播放头复打"
                 ImitatePhase.Result -> "结果"
             },
             color = MaterialTheme.colorScheme.onSurfaceVariant

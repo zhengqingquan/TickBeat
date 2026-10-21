@@ -135,9 +135,13 @@ class ImitateViewModel(app: Application) : AndroidViewModel(app) {
     private fun finishRecord() {
         playheadJob?.cancel()
         val map = _ui.value.selected ?: return
-        // Relative rhythm: first tap = first note, overall tempo stretch ignored.
-        val expected = map.expectedTimesMs(0L)
-        val score = Judge.evaluateRelative(
+        // Absolute timing vs the silent record bar (same clock as the playhead).
+        // Relative-first-tap anchoring falsely paints beat 1 green when the only
+        // tap was actually on a later note.
+        val beatMs = 60_000.0 / map.bpm.coerceAtLeast(1)
+        val recordOriginMs = (engine.audibleOriginUptimeMs + recordFromBeat * beatMs).toLong()
+        val expected = map.expectedTimesMs(recordOriginMs)
+        val score = Judge.evaluate(
             expected,
             applyInputOffset(taps.toList(), timing.inputOffsetMs)
         )
