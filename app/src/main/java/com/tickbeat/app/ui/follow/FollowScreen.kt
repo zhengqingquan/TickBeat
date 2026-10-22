@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -83,12 +85,18 @@ fun FollowScreen(
 
         when (state.phase) {
             FollowPhase.Idle, FollowPhase.Finished -> {
-                TextButton(onClick = viewModel::start) {
+                Button(
+                    onClick = viewModel::start,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
                     Text(if (state.phase == FollowPhase.Finished) "再来一次" else "开始跟拍")
                 }
             }
             FollowPhase.Playing -> {
-                TextButton(onClick = viewModel::stop) { Text("结束") }
+                OutlinedButton(onClick = viewModel::stop) { Text("结束") }
             }
         }
 
