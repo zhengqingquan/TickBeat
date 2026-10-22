@@ -27,6 +27,7 @@
     #paper svg {
       display: block;
       max-width: 100%;
+      overflow: visible;
     }
   </style>
 </head>
@@ -46,6 +47,35 @@
       var iw = window.innerWidth || document.documentElement.clientWidth || 0;
       if (iw > 0) return iw;
       return Math.max(200, fallback || 360);
+    }
+
+    function keyOctave(key) {
+      var m = String(key || "").match(/\/(-?\d+)/);
+      return m ? parseInt(m[1], 10) : 4;
+    }
+
+    /** Place the stave so extreme ledger lines stay inside the drawing canvas. */
+    function layoutForPitch(clefName, octave) {
+      // Visible box height in the Android WebView.
+      var viewH = 180;
+      var staveTop = 55;
+      var canvasH = 300;
+      if (clefName === "treble" && octave >= 6) {
+        // C6–C7: many ledger lines above the staff.
+        staveTop = 170;
+        canvasH = 360;
+      } else if (clefName === "treble" && octave >= 5) {
+        staveTop = 110;
+        canvasH = 320;
+      } else if (clefName === "bass" && octave <= 1) {
+        // C1–D1: many ledger lines below the staff.
+        staveTop = 35;
+        canvasH = 380;
+      } else if (clefName === "bass" && octave <= 2) {
+        staveTop = 40;
+        canvasH = 340;
+      }
+      return { viewH: viewH, staveTop: staveTop, canvasH: canvasH };
     }
 
     function paintShape(node, fill) {
@@ -68,12 +98,32 @@
       paper.querySelectorAll(".vf-notehead path, .vf-notehead rect, .vf-notehead polygon, .vf-stem path, .vf-stem line, .vf-stem polygon").forEach(function (p) {
         paintShape(p, fill);
       });
-      // Accidentals are filled glyphs, not stroke-only ledger lines.
       paper.querySelectorAll(".vf-stavenote path, .vf-stavenote polygon").forEach(function (p) {
         if (p.closest(".vf-notehead") || p.closest(".vf-stem")) return;
         if (p.getAttribute("fill") === "none") return;
         paintShape(p, fill);
       });
+    }
+
+    function fitSvgToView(paper, viewW, viewH) {
+      var svg = paper.querySelector("svg");
+      if (!svg) return;
+      try {
+        var bbox = svg.getBBox();
+        if (!bbox || !(bbox.width > 0) || !(bbox.height > 0)) return;
+        var pad = 12;
+        var vbX = bbox.x - pad;
+        var vbY = bbox.y - pad;
+        var vbW = Math.max(1, bbox.width + pad * 2);
+        var vbH = Math.max(1, bbox.height + pad * 2);
+        svg.setAttribute("viewBox", vbX + " " + vbY + " " + vbW + " " + vbH);
+        svg.setAttribute("width", String(viewW));
+        svg.setAttribute("height", String(viewH));
+        svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        svg.style.width = "100%";
+        svg.style.height = viewH + "px";
+        svg.style.overflow = "visible";
+      } catch (e) {}
     }
 
     /**
@@ -87,7 +137,9 @@
       baseFg = fg || "#1A1A1A";
       var clefName = (clef === "bass") ? "bass" : "treble";
       var w = containerWidth(staffWidth);
-      var h = 140;
+      var octave = keyOctave(lastKey);
+      var layout = layoutForPitch(clefName, octave);
+      var h = layout.viewH;
 
       var paper = document.getElementById("paper");
       paper.innerHTML = "";
@@ -101,7 +153,7 @@
       }
 
       var renderer = new VF.Renderer(paper, VF.Renderer.Backends.SVG);
-      renderer.resize(w, h);
+      renderer.resize(w, layout.canvasH);
       var context = renderer.getContext();
       context.setFillStyle(baseFg);
       context.setStrokeStyle(baseFg);
@@ -109,7 +161,7 @@
       var marginL = 8;
       var marginR = 16;
       var staveW = Math.max(120, w - marginL - marginR);
-      var stave = new VF.Stave(marginL, 10, staveW);
+      var stave = new VF.Stave(marginL, layout.staveTop, staveW);
       stave.addClef(clefName);
       stave.setContext(context).draw();
 
@@ -129,6 +181,8 @@
       voice.addTickables([note]);
       new VF.Formatter().joinVoices([voice]).formatToStave([voice], stave);
       voice.draw(context, stave);
+
+      fitSvgToView(paper, w, h);
 
       ready = true;
       if (grade === "correct") paintNoteColor("#2E7D32");

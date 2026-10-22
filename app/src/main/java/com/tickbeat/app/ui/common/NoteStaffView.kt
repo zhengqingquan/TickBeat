@@ -59,7 +59,7 @@ fun NoteStaffView(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(140.dp)
+            .height(180.dp)
             .onSizeChanged { size ->
                 if (size.width > 0) {
                     val dp = with(density) { size.width.toDp().value.toInt() }
@@ -70,7 +70,7 @@ fun NoteStaffView(
         AndroidView(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp),
+                .height(180.dp),
             factory = { context ->
                 val host = NoteStaffHost().apply {
                     pendingKey = vexKey
