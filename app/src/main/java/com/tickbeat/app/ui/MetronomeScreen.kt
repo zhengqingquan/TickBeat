@@ -40,12 +40,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,14 +66,6 @@ fun MetronomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val activity = LocalContext.current as? Activity
-    // Inflate NumberPickers after first frames so the main chrome paints immediately.
-    var wheelsReady by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        withFrameMillis { }
-        withFrameMillis { }
-        wheelsReady = true
-    }
 
     // Nav saveState keeps the ViewModel alive across drawer switches; stop audio on leave.
     DisposableEffect(viewModel) {
@@ -194,16 +183,12 @@ fun MetronomeScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            if (wheelsReady) {
-                TimeSignatureWheelPicker(
-                    beats = state.timeSignature.beats,
-                    noteValue = state.timeSignature.noteValue,
-                    onBeatsChange = viewModel::setBeats,
-                    onNoteValueChange = viewModel::setNoteValue
-                )
-            } else {
-                Spacer(Modifier.height(156.dp))
-            }
+            TimeSignatureWheelPicker(
+                beats = state.timeSignature.beats,
+                noteValue = state.timeSignature.noteValue,
+                onBeatsChange = viewModel::setBeats,
+                onNoteValueChange = viewModel::setNoteValue
+            )
 
             Spacer(Modifier.weight(1f))
         }
