@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.tickbeat.app.domain.IntervalQuestionFactory
 import com.tickbeat.app.domain.IntervalRange
 
 private data class PianoKey(
@@ -39,8 +40,8 @@ private data class PianoKey(
     val whiteIndex: Int
 )
 
-/** C4–C5 inclusive: 8 white keys, 5 black keys. */
-private fun buildOctaveKeys(lowMidi: Int = IntervalRange.LOW_MIDI): List<PianoKey> {
+/** One octave inclusive of both ends (C..C): 8 white keys, 5 black keys. */
+private fun buildOctaveKeys(lowMidi: Int): List<PianoKey> {
     val whiteOffsets = listOf(0, 2, 4, 5, 7, 9, 11, 12)
     val blackOffsets = listOf(1, 3, 6, 8, 10)
     val blackAfterWhite = listOf(0, 1, 3, 4, 5)
@@ -58,9 +59,11 @@ fun PianoKeyboard(
     onNoteDown: (midi: Int) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    highlightMidi: Int? = null
+    highlightMidi: Int? = null,
+    lowMidi: Int = IntervalRange.LOW_MIDI,
+    highMidi: Int = IntervalRange.HIGH_MIDI
 ) {
-    val keys = remember { buildOctaveKeys() }
+    val keys = remember(lowMidi) { buildOctaveKeys(lowMidi) }
     val whiteKeys = remember(keys) { keys.filter { !it.isBlack } }
     val blackKeys = remember(keys) { keys.filter { it.isBlack } }
     var pressedMidi by remember { mutableStateOf<Int?>(null) }
@@ -96,9 +99,9 @@ fun PianoKeyboard(
                         .background(bg)
                         .notePress(enabled, key.midi, onNoteDown) { pressedMidi = it }
                 ) {
-                    if (key.midi == IntervalRange.LOW_MIDI || key.midi == IntervalRange.HIGH_MIDI) {
+                    if (key.midi == lowMidi || key.midi == highMidi) {
                         Text(
-                            text = if (key.midi == IntervalRange.LOW_MIDI) "C4" else "C5",
+                            text = IntervalQuestionFactory.midiName(key.midi),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant

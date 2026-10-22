@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Hearing
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Piano
@@ -57,6 +58,8 @@ import com.tickbeat.app.ui.imitate.ImitateScreen
 import com.tickbeat.app.ui.imitate.ImitateViewModel
 import com.tickbeat.app.ui.interval.IntervalScreen
 import com.tickbeat.app.ui.interval.IntervalViewModel
+import com.tickbeat.app.ui.noteread.NoteReadScreen
+import com.tickbeat.app.ui.noteread.NoteReadViewModel
 import com.tickbeat.app.ui.settings.LatencySettingsScreen
 import com.tickbeat.app.ui.settings.LatencySettingsViewModel
 import com.tickbeat.app.ui.sightread.SightReadScreen
@@ -78,6 +81,7 @@ private object Routes {
     const val SightRead = "sightread"
     const val EarTrain = "eartrain"
     const val Interval = "interval"
+    const val NoteRead = "noteread"
     const val Latency = "latency"
 }
 
@@ -88,6 +92,7 @@ private val drawerDestinations = listOf(
     DrawerDest(Routes.SightRead, "视奏节奏", Icons.Filled.MusicNote),
     DrawerDest(Routes.EarTrain, "听辨纠错", Icons.Filled.Hearing),
     DrawerDest(Routes.Interval, "音程练习", Icons.Filled.Piano),
+    DrawerDest(Routes.NoteRead, "钢琴识谱", Icons.Filled.LibraryMusic),
     DrawerDest(Routes.Latency, "设置延迟补偿", Icons.Filled.Tune)
 )
 
@@ -226,6 +231,11 @@ fun TickBeatApp() {
                     val vm: IntervalViewModel = viewModel()
                     StopWhenHidden(visible = route == Routes.Interval, stop = vm::stop)
                     IntervalScreen(viewModel = vm)
+                }
+                KeepAlivePage(visible = route == Routes.NoteRead, mounted = Routes.NoteRead in visited) {
+                    val vm: NoteReadViewModel = viewModel()
+                    StopWhenHidden(visible = route == Routes.NoteRead, stop = vm::stop)
+                    NoteReadScreen(viewModel = vm)
                 }
                 KeepAlivePage(visible = route == Routes.Latency, mounted = Routes.Latency in visited) {
                     val vm: LatencySettingsViewModel = viewModel()

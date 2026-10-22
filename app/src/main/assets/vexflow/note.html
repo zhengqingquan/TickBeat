@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <script src="vexflow.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    #paper {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    #paper svg {
+      display: block;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="paper"></div>
+  </div>
+  <script>
+    var ready = false;
+    var baseFg = "#1A1A1A";
+    var lastKey = "c/4";
+
+    function containerWidth(fallback) {
+      var wrap = document.getElementById("wrap");
+      var cw = wrap ? wrap.clientWidth : 0;
+      if (cw > 0) return cw;
+      var iw = window.innerWidth || document.documentElement.clientWidth || 0;
+      if (iw > 0) return iw;
+      return Math.max(200, fallback || 360);
+    }
+
+    function paintNoteColor(fill) {
+      var paper = document.getElementById("paper");
+      if (!paper || !fill) return;
+      paper.querySelectorAll(".vf-stavenote path, .vf-stavenote rect, .vf-stavenote line, .vf-stavenote polygon, .vf-stem path, .vf-stem line, .vf-accidental path").forEach(function (p) {
+        if (p.getAttribute("fill") !== "none") {
+          p.style.fill = fill;
+          p.setAttribute("fill", fill);
+        }
+        p.style.stroke = fill;
+        p.setAttribute("stroke", fill);
+      });
+    }
+
+    /**
+     * @param key VexFlow key e.g. "c/4", "f#/5"
+     * @param grade null | "correct" | "wrong"
+     */
+    function renderNote(key, fg, staffWidth, grade) {
+      ready = false;
+      lastKey = key || "c/4";
+      baseFg = fg || "#1A1A1A";
+      var w = containerWidth(staffWidth);
+      var h = 140;
+
+      var paper = document.getElementById("paper");
+      paper.innerHTML = "";
+      paper.style.width = "100%";
+      paper.style.height = h + "px";
+
+      var VF = (window.Vex && window.Vex.Flow) ? window.Vex.Flow : window.VexFlow;
+      if (!VF) {
+        console.error("VexFlow not loaded");
+        return 0;
+      }
+
+      var renderer = new VF.Renderer(paper, VF.Renderer.Backends.SVG);
+      renderer.resize(w, h);
+      var context = renderer.getContext();
+      context.setFillStyle(baseFg);
+      context.setStrokeStyle(baseFg);
+
+      var marginL = 8;
+      var marginR = 16;
+      var staveW = Math.max(120, w - marginL - marginR);
+      var stave = new VF.Stave(marginL, 10, staveW);
+      stave.addClef("treble");
+      stave.setContext(context).draw();
+
+      var note = new VF.StaveNote({
+        keys: [lastKey],
+        duration: "q",
+        clef: "treble",
+        auto_stem: true
+      });
+      if (lastKey.indexOf("#") >= 0) {
+        note.addModifier(new VF.Accidental("#"), 0);
+      } else if (lastKey.indexOf("b") === 1 || /[a-g]b\//.test(lastKey)) {
+        note.addModifier(new VF.Accidental("b"), 0);
+      }
+
+      var voice = new VF.Voice({ numBeats: 4, beatValue: 4 }).setMode(VF.Voice.Mode.SOFT);
+      voice.addTickables([note]);
+      new VF.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+      voice.draw(context, stave);
+
+      ready = true;
+      if (grade === "correct") paintNoteColor("#2E7D32");
+      else if (grade === "wrong") paintNoteColor("#C62828");
+      else paintNoteColor(baseFg);
+
+      if (window.TickBeat && window.TickBeat.onNoteRendered) {
+        window.TickBeat.onNoteRendered(lastKey);
+      }
+      return 1;
+    }
+
+    function setGrade(grade) {
+      if (!ready) return;
+      if (grade === "correct") paintNoteColor("#2E7D32");
+      else if (grade === "wrong") paintNoteColor("#C62828");
+      else paintNoteColor(baseFg);
+    }
+  </script>
+</body>
+</html>
