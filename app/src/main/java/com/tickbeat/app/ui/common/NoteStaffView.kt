@@ -24,21 +24,24 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.tickbeat.app.domain.NoteClef
 import com.tickbeat.app.domain.NoteReadFactory
 import org.json.JSONObject
 
 /**
- * Single pitched note on a treble staff (offline VexFlow WebView).
+ * Single pitched note on a treble/bass staff (offline VexFlow WebView).
  * [correct] null = neutral; true/false tints the note green/red after answer.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun NoteStaffView(
     midi: Int,
+    clef: NoteClef = NoteClef.Treble,
     correct: Boolean? = null,
     modifier: Modifier = Modifier
 ) {
     val vexKey = remember(midi) { NoteReadFactory.vexKey(midi) }
+    val clefName = clef.vexName
     val fg = MaterialTheme.colorScheme.onBackground.toArgb()
     val fgHex = String.format("#%06X", 0xFFFFFF and fg)
     val grade = when (correct) {
@@ -71,6 +74,7 @@ fun NoteStaffView(
             factory = { context ->
                 val host = NoteStaffHost().apply {
                     pendingKey = vexKey
+                    pendingClef = clefName
                     pendingFg = fgHex
                     pendingWidth = staffWidthDp
                     pendingGrade = grade
@@ -103,6 +107,7 @@ fun NoteStaffView(
             update = { webView ->
                 val host = webView.tag as? NoteStaffHost ?: return@AndroidView
                 host.pendingKey = vexKey
+                host.pendingClef = clefName
                 host.pendingFg = fgHex
                 host.pendingWidth = staffWidthDp
                 host.pendingGrade = grade
@@ -128,6 +133,7 @@ private class NoteStaffHost {
     private var lastGrade: String? = ""
 
     var pendingKey: String = "c/4"
+    var pendingClef: String = "treble"
     var pendingFg: String = "#222222"
     var pendingWidth: Int = 0
     var pendingGrade: String? = null
@@ -135,8 +141,9 @@ private class NoteStaffHost {
     fun flush(webView: WebView) {
         if (pendingWidth <= 0) return
         val key = pendingKey
+        val clef = pendingClef
         val grade = pendingGrade
-        val renderKey = "$key|$pendingFg|$pendingWidth"
+        val renderKey = "$key|$clef|$pendingFg|$pendingWidth"
         if (renderKey != lastRender) {
             lastRender = renderKey
             lastGrade = grade
@@ -149,6 +156,8 @@ private class NoteStaffHost {
                 append(pendingWidth)
                 append(',')
                 if (grade == null) append("null") else append(JSONObject.quote(grade))
+                append(',')
+                append(JSONObject.quote(clef))
                 append(')')
             }
             webView.evaluateJavascript(js, null)

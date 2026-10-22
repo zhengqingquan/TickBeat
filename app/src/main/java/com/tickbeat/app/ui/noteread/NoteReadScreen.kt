@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tickbeat.app.domain.IntervalQuestionFactory
+import com.tickbeat.app.domain.NoteClef
 import com.tickbeat.app.domain.NoteRange
 import com.tickbeat.app.ui.common.NoteStaffView
 import com.tickbeat.app.ui.common.PianoKeyboard
@@ -35,6 +36,7 @@ fun NoteReadScreen(
 ) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
     val q = state.question
+    val ranges = NoteRange.forClef(state.clef)
 
     DisposableEffect(Unit) {
         onDispose { viewModel.stop() }
@@ -52,7 +54,7 @@ fun NoteReadScreen(
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "练习音域",
+            text = "谱号 / 音域",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth()
@@ -62,7 +64,20 @@ fun NoteReadScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            NoteRange.entries.forEach { range ->
+            NoteClef.entries.forEach { clef ->
+                FilterChip(
+                    selected = clef == state.clef,
+                    onClick = { viewModel.selectClef(clef) },
+                    label = { Text(clef.labelZh) }
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            ranges.forEach { range ->
                 FilterChip(
                     selected = range == state.range,
                     onClick = { viewModel.selectRange(range) },
@@ -86,6 +101,7 @@ fun NoteReadScreen(
         if (q != null) {
             NoteStaffView(
                 midi = q.midi,
+                clef = state.clef,
                 correct = if (state.phase == NoteReadPhase.Answered) state.correct else null,
                 modifier = Modifier.fillMaxWidth()
             )

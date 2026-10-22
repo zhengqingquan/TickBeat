@@ -3,6 +3,7 @@ package com.tickbeat.app.ui.noteread
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.tickbeat.app.audio.TonePlaybackEngine
+import com.tickbeat.app.domain.NoteClef
 import com.tickbeat.app.domain.NoteRange
 import com.tickbeat.app.domain.NoteReadFactory
 import com.tickbeat.app.domain.NoteReadQuestion
@@ -21,6 +22,7 @@ data class NoteReadUiState(
     val streak: Int = 0,
     val answeredCount: Int = 0,
     val correctCount: Int = 0,
+    val clef: NoteClef = NoteClef.Treble,
     val range: NoteRange = NoteRange.C4C5,
     val allowAccidentals: Boolean = true
 )
@@ -36,8 +38,17 @@ class NoteReadViewModel(app: Application) : AndroidViewModel(app) {
         nextQuestion(play = false)
     }
 
+    fun selectClef(clef: NoteClef) {
+        if (clef == _ui.value.clef) return
+        val range = _ui.value.range
+        val nextRange = if (range.suitableFor(clef)) range else NoteRange.defaultFor(clef)
+        _ui.update { it.copy(clef = clef, range = nextRange) }
+        nextQuestion(play = false)
+    }
+
     fun selectRange(range: NoteRange) {
         if (range == _ui.value.range) return
+        if (!range.suitableFor(_ui.value.clef)) return
         _ui.update { it.copy(range = range) }
         nextQuestion(play = false)
     }

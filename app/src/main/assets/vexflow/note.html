@@ -63,12 +63,14 @@
 
     /**
      * @param key VexFlow key e.g. "c/4", "f#/5"
+     * @param clef "treble" | "bass"
      * @param grade null | "correct" | "wrong"
      */
-    function renderNote(key, fg, staffWidth, grade) {
+    function renderNote(key, fg, staffWidth, grade, clef) {
       ready = false;
       lastKey = key || "c/4";
       baseFg = fg || "#1A1A1A";
+      var clefName = (clef === "bass") ? "bass" : "treble";
       var w = containerWidth(staffWidth);
       var h = 140;
 
@@ -93,18 +95,18 @@
       var marginR = 16;
       var staveW = Math.max(120, w - marginL - marginR);
       var stave = new VF.Stave(marginL, 10, staveW);
-      stave.addClef("treble");
+      stave.addClef(clefName);
       stave.setContext(context).draw();
 
       var note = new VF.StaveNote({
         keys: [lastKey],
         duration: "q",
-        clef: "treble",
+        clef: clefName,
         auto_stem: true
       });
       if (lastKey.indexOf("#") >= 0) {
         note.addModifier(new VF.Accidental("#"), 0);
-      } else if (lastKey.indexOf("b") === 1 || /[a-g]b\//.test(lastKey)) {
+      } else if (/[a-g]b\//.test(lastKey)) {
         note.addModifier(new VF.Accidental("b"), 0);
       }
 

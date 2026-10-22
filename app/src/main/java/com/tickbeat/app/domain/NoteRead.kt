@@ -1,14 +1,36 @@
 package com.tickbeat.app.domain
 
+enum class NoteClef(val labelZh: String, val vexName: String) {
+    Treble("高音谱号", "treble"),
+    Bass("低音谱号", "bass");
+}
+
 /** One-octave practice ranges (inclusive high C). */
 enum class NoteRange(
     val lowMidi: Int,
     val highMidi: Int,
     val labelZh: String
 ) {
+    C2C3(36, 48, "C2–C3"),
     C3C4(48, 60, "C3–C4"),
     C4C5(60, 72, "C4–C5"),
     C5C6(72, 84, "C5–C6");
+
+    fun suitableFor(clef: NoteClef): Boolean = when (clef) {
+        // Avoid extreme ledger lines on each clef.
+        NoteClef.Treble -> this != C2C3
+        NoteClef.Bass -> this != C5C6
+    }
+
+    companion object {
+        fun forClef(clef: NoteClef): List<NoteRange> =
+            entries.filter { it.suitableFor(clef) }
+
+        fun defaultFor(clef: NoteClef): NoteRange = when (clef) {
+            NoteClef.Treble -> C4C5
+            NoteClef.Bass -> C3C4
+        }
+    }
 }
 
 data class NoteReadQuestion(val midi: Int)
