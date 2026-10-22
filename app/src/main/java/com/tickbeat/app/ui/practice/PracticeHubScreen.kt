@@ -42,7 +42,7 @@ fun PracticeHubScreen(
 
         PracticeCard("跟拍", "听 click，按拍敲击并查看误差", onFollow)
         PracticeCard("节奏模仿", "听示范后复打，对比打分", onImitate)
-        PracticeCard("视奏节奏", "看时值块跟打，播放头同步", onSightRead)
+        PracticeCard("视奏节奏", "看谱自打，相对时值打分", onSightRead)
         PracticeCard("听辨纠错", "听错误节奏并指出问题", onEarTrain)
     }
 }

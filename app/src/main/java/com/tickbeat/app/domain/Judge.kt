@@ -40,13 +40,12 @@ object JudgeConfig {
 
 object Judge {
     /**
-     * Imitate mode: judge **relative rhythm**, not wall-clock tempo.
+     * Sight-read (and similar): judge **relative rhythm**, not wall-clock tempo.
      * Aligns the first tap to the first expected note, then linearly stretches the
      * tap timeline so its span matches the expected span (ignores overall speed),
      * then runs the same windows as [evaluate].
      *
-     * This avoids the common feel that “the end gets faster” when the player is
-     * slightly slow under absolute timing.
+     * Overall tempo is free; only interval proportions matter.
      */
     fun evaluateRelative(
         expectedMs: List<Long>,

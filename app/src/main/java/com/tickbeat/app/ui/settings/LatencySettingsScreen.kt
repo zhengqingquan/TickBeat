@@ -55,7 +55,7 @@ fun LatencySettingsScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "用于跟拍、节奏模仿、视奏。正值表示敲击偏晚（常见于音频更晚到达）。有线耳机更准，蓝牙误差可能较大。",
+            text = "用于跟拍、节奏模仿；视奏为相对时值也会套用。正值表示敲击偏晚（常见于音频更晚到达）。有线耳机更准，蓝牙误差可能较大。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,20 +51,12 @@ fun SightReadScreen(
             state.maps.forEach { item ->
                 FilterChip(
                     selected = item.id == map?.id,
-                    enabled = state.phase != SightPhase.Playing,
+                    enabled = state.phase != SightPhase.Recording,
                     onClick = { viewModel.select(item) },
                     label = { Text(item.title.substringAfter("· ").ifEmpty { item.title }) }
                 )
             }
         }
-
-        Spacer(Modifier.height(8.dp))
-        FilterChip(
-            selected = state.clickEnabled,
-            onClick = viewModel::toggleClick,
-            enabled = state.phase != SightPhase.Playing,
-            label = { Text(if (state.clickEnabled) "弱拍提示：开" else "弱拍提示：关") }
-        )
 
         Spacer(Modifier.height(16.dp))
         if (map != null) {
@@ -70,31 +64,48 @@ fun SightReadScreen(
             Spacer(Modifier.height(8.dp))
             VexRhythmView(
                 beatmap = map,
-                playheadBeat = state.playheadBeat,
+                playheadBeat = null,
                 score = state.score
             )
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = when (state.phase) {
+                SightPhase.Ready -> "看谱自打，第一下开始；比相对时值，不跟节拍器"
+                SightPhase.Recording -> "打拍中 ${state.tapCount}/${state.expectedCount}"
+                SightPhase.Result -> "结果"
+            },
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(Modifier.height(12.dp))
         TapPad(
-            enabled = state.phase == SightPhase.Playing,
-            label = if (state.phase == SightPhase.Playing) "按谱打拍" else "开始后打拍",
+            enabled = state.phase != SightPhase.Result && map != null,
+            label = when (state.phase) {
+                SightPhase.Ready -> "看谱打拍"
+                SightPhase.Recording -> "继续打拍"
+                SightPhase.Result -> "已结束"
+            },
             onTap = viewModel::onTap
         )
 
         Spacer(Modifier.height(12.dp))
         when (state.phase) {
-            SightPhase.Pick, SightPhase.Result -> {
-                TextButton(onClick = viewModel::start) { Text("开始视奏") }
+            SightPhase.Ready -> Unit
+            SightPhase.Recording -> {
+                OutlinedButton(onClick = viewModel::finish) {
+                    Text("完成打分")
+                }
             }
-            SightPhase.Playing -> {
-                TextButton(onClick = viewModel::stop) { Text("结束") }
+            SightPhase.Result -> {
+                TextButton(onClick = viewModel::reset) { Text("再打一次") }
             }
         }
 
         state.score?.let {
             Spacer(Modifier.height(16.dp))
-            ScoreReportCard(score = it, onRetry = viewModel::start)
+            ScoreReportCard(score = it, onRetry = viewModel::reset)
         }
     }
 }
