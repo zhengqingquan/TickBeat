@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Piano
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
@@ -60,6 +61,8 @@ import com.tickbeat.app.ui.imitate.ImitateScreen
 import com.tickbeat.app.ui.imitate.ImitateViewModel
 import com.tickbeat.app.ui.interval.IntervalScreen
 import com.tickbeat.app.ui.interval.IntervalViewModel
+import com.tickbeat.app.ui.keysig.KeySigScreen
+import com.tickbeat.app.ui.keysig.KeySigViewModel
 import com.tickbeat.app.ui.noteread.NoteReadScreen
 import com.tickbeat.app.ui.noteread.NoteReadViewModel
 import com.tickbeat.app.ui.settings.LatencySettingsScreen
@@ -84,6 +87,7 @@ private object Routes {
     const val EarTrain = "eartrain"
     const val Interval = "interval"
     const val NoteRead = "noteread"
+    const val KeySig = "keysig"
     const val Latency = "latency"
 }
 
@@ -95,6 +99,7 @@ private val drawerDestinations = listOf(
     DrawerDest(Routes.EarTrain, "听辨纠错", Icons.Filled.Hearing),
     DrawerDest(Routes.Interval, "音程练习", Icons.Filled.Piano),
     DrawerDest(Routes.NoteRead, "钢琴识谱", Icons.Filled.LibraryMusic),
+    DrawerDest(Routes.KeySig, "调号练习", Icons.Filled.Tag),
     DrawerDest(Routes.Latency, "设置延迟补偿", Icons.Filled.Tune)
 )
 
@@ -238,6 +243,11 @@ fun TickBeatApp() {
                     val vm: NoteReadViewModel = viewModel()
                     StopWhenHidden(visible = route == Routes.NoteRead, stop = vm::stop)
                     NoteReadScreen(viewModel = vm)
+                }
+                KeepAlivePage(visible = route == Routes.KeySig, mounted = Routes.KeySig in visited) {
+                    val vm: KeySigViewModel = viewModel()
+                    StopWhenHidden(visible = route == Routes.KeySig, stop = vm::stop)
+                    KeySigScreen(viewModel = vm)
                 }
                 KeepAlivePage(visible = route == Routes.Latency, mounted = Routes.Latency in visited) {
                     val vm: LatencySettingsViewModel = viewModel()

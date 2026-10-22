@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <script src="vexflow.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    #paper {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    #paper svg {
+      display: block;
+      max-width: 100%;
+      overflow: visible;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="paper"></div>
+  </div>
+  <script>
+    var ready = false;
+    var baseFg = "#1A1A1A";
+
+    function containerWidth(fallback) {
+      var wrap = document.getElementById("wrap");
+      var cw = wrap ? wrap.clientWidth : 0;
+      if (cw > 0) return cw;
+      var iw = window.innerWidth || document.documentElement.clientWidth || 0;
+      if (iw > 0) return iw;
+      return Math.max(200, fallback || 360);
+    }
+
+    /**
+     * Empty staff with clef + key signature (no notes).
+     * @param keySig VexFlow key name e.g. "G", "Bb", "F#", "C"
+     * @param clef "treble" | "bass"
+     */
+    function renderKeySig(keySig, fg, staffWidth, clef) {
+      ready = false;
+      baseFg = fg || "#1A1A1A";
+      var clefName = (clef === "bass") ? "bass" : "treble";
+      var sig = keySig || "C";
+      var w = containerWidth(staffWidth);
+      var viewH = 140;
+      var canvasH = 160;
+      var staveTop = 20;
+
+      var paper = document.getElementById("paper");
+      paper.innerHTML = "";
+      paper.style.width = "100%";
+      paper.style.height = viewH + "px";
+
+      var VF = (window.Vex && window.Vex.Flow) ? window.Vex.Flow : window.VexFlow;
+      if (!VF) {
+        console.error("VexFlow not loaded");
+        return 0;
+      }
+
+      var renderer = new VF.Renderer(paper, VF.Renderer.Backends.SVG);
+      renderer.resize(w, canvasH);
+      var context = renderer.getContext();
+      context.setFillStyle(baseFg);
+      context.setStrokeStyle(baseFg);
+
+      var marginL = 8;
+      var marginR = 16;
+      var staveW = Math.max(160, w - marginL - marginR);
+      var stave = new VF.Stave(marginL, staveTop, staveW);
+      stave.addClef(clefName);
+      if (sig && sig !== "C") {
+        stave.addKeySignature(sig);
+      } else {
+        // Explicit C major still adds nothing; keep stave drawn cleanly.
+        try { stave.addKeySignature("C"); } catch (e) { /* ignore */ }
+      }
+      stave.setContext(context).draw();
+
+      ready = true;
+      try {
+        if (window.TickBeat && TickBeat.onKeySigRendered) {
+          TickBeat.onKeySigRendered(sig, clefName);
+        }
+      } catch (e) {}
+      return staveW;
+    }
+
+    window.renderKeySig = renderKeySig;
+  </script>
+</body>
+</html>
