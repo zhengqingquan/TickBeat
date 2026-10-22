@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color as AndroidColor
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -42,6 +43,7 @@ fun VexRhythmView(
     score: SessionScore? = null,
     modifier: Modifier = Modifier
 ) {
+    val pageVisible = LocalPageVisible.current
     val scoreJson = remember(beatmap) { beatmap.toVexScoreJson() }
     val beatsJson = remember(beatmap) {
         JSONArray(beatmap.events.map { it.tBeat }).toString()
@@ -120,6 +122,8 @@ fun VexRhythmView(
                 }
             },
             update = { webView ->
+                // size(0.dp) keep-alive does not stop WebView from painting over other routes.
+                webView.visibility = if (pageVisible) View.VISIBLE else View.GONE
                 val host = webView.tag as? VexHost ?: return@AndroidView
                 host.pendingScore = scoreJson
                 host.pendingBeats = beatsJson
@@ -128,7 +132,7 @@ fun VexRhythmView(
                 host.pendingWidth = staffWidthDp
                 host.pendingGrades = gradesJson
                 host.pendingPlayhead = playheadBeat
-                if (host.ready) webView.post { host.flush(webView) }
+                if (pageVisible && host.ready) webView.post { host.flush(webView) }
             }
         )
     }

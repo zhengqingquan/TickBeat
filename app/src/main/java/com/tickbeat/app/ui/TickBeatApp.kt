@@ -33,6 +33,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tickbeat.app.data.BeatmapRepository
 import com.tickbeat.app.metronome.MetronomeViewModel
+import com.tickbeat.app.ui.common.LocalPageVisible
 import com.tickbeat.app.ui.eartrain.EarTrainScreen
 import com.tickbeat.app.ui.eartrain.EarTrainViewModel
 import com.tickbeat.app.ui.follow.FollowScreen
@@ -257,12 +259,15 @@ private fun KeepAlivePage(
     // Keep composition for instant switches, but collapse hidden pages so the drawer
     // animation only transforms the active screen (alpha-0 full-size layers were janky,
     // especially with NumberPicker AndroidViews).
+    // WebViews ignore size(0.dp) and keep painting — LocalPageVisible lets them GONE.
     Box(
         modifier = Modifier
             .zIndex(if (visible) 1f else 0f)
             .then(if (visible) Modifier.fillMaxSize() else Modifier.size(0.dp))
     ) {
-        content()
+        CompositionLocalProvider(LocalPageVisible provides visible) {
+            content()
+        }
     }
 }
 

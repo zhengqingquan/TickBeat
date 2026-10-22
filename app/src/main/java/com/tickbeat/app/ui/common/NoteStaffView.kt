@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color as AndroidColor
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -40,6 +41,7 @@ fun NoteStaffView(
     correct: Boolean? = null,
     modifier: Modifier = Modifier
 ) {
+    val pageVisible = LocalPageVisible.current
     val vexKey = remember(midi) { NoteReadFactory.vexKey(midi) }
     val clefName = clef.vexName
     val fg = MaterialTheme.colorScheme.onBackground.toArgb()
@@ -105,13 +107,15 @@ fun NoteStaffView(
                 }
             },
             update = { webView ->
+                // size(0.dp) keep-alive does not stop WebView from painting over other routes.
+                webView.visibility = if (pageVisible) View.VISIBLE else View.GONE
                 val host = webView.tag as? NoteStaffHost ?: return@AndroidView
                 host.pendingKey = vexKey
                 host.pendingClef = clefName
                 host.pendingFg = fgHex
                 host.pendingWidth = staffWidthDp
                 host.pendingGrade = grade
-                if (host.ready) webView.post { host.flush(webView) }
+                if (pageVisible && host.ready) webView.post { host.flush(webView) }
             }
         )
     }
