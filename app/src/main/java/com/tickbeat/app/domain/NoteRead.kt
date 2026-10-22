@@ -11,15 +11,17 @@ enum class NoteRange(
     val highMidi: Int,
     val labelZh: String
 ) {
+    C1C2(24, 36, "C1–C2"),
     C2C3(36, 48, "C2–C3"),
     C3C4(48, 60, "C3–C4"),
     C4C5(60, 72, "C4–C5"),
-    C5C6(72, 84, "C5–C6");
+    C5C6(72, 84, "C5–C6"),
+    C6C7(84, 96, "C6–C7");
 
     fun suitableFor(clef: NoteClef): Boolean = when (clef) {
         // Avoid extreme ledger lines on each clef.
-        NoteClef.Treble -> this != C2C3
-        NoteClef.Bass -> this != C5C6
+        NoteClef.Treble -> this != C1C2 && this != C2C3
+        NoteClef.Bass -> this != C5C6 && this != C6C7
     }
 
     companion object {
