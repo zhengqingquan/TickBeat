@@ -24,7 +24,9 @@ data class NoteReadUiState(
     val correctCount: Int = 0,
     val clef: NoteClef = NoteClef.Treble,
     val range: NoteRange = NoteRange.C4C5,
-    val allowAccidentals: Boolean = true
+    val allowAccidentals: Boolean = true,
+    /** When true, each question picks a random clef + suitable octave. */
+    val fullRandom: Boolean = false
 )
 
 class NoteReadViewModel(app: Application) : AndroidViewModel(app) {
@@ -38,18 +40,26 @@ class NoteReadViewModel(app: Application) : AndroidViewModel(app) {
         nextQuestion(play = false)
     }
 
+    fun toggleFullRandom() {
+        _ui.update { it.copy(fullRandom = !it.fullRandom) }
+        nextQuestion(play = false)
+    }
+
     fun selectClef(clef: NoteClef) {
-        if (clef == _ui.value.clef) return
         val range = _ui.value.range
         val nextRange = if (range.suitableFor(clef)) range else NoteRange.defaultFor(clef)
-        _ui.update { it.copy(clef = clef, range = nextRange) }
+        _ui.update { it.copy(fullRandom = false, clef = clef, range = nextRange) }
         nextQuestion(play = false)
     }
 
     fun selectRange(range: NoteRange) {
-        if (range == _ui.value.range) return
-        if (!range.suitableFor(_ui.value.clef)) return
-        _ui.update { it.copy(range = range) }
+        if (!range.suitableFor(_ui.value.clef) && !_ui.value.fullRandom) return
+        // Picking a fixed range exits full-random; keep current clef if suitable.
+        val clef = _ui.value.clef
+        val nextClef = if (range.suitableFor(clef)) clef else {
+            NoteClef.entries.first { range.suitableFor(it) }
+        }
+        _ui.update { it.copy(fullRandom = false, clef = nextClef, range = range) }
         nextQuestion(play = false)
     }
 
@@ -62,8 +72,28 @@ class NoteReadViewModel(app: Application) : AndroidViewModel(app) {
         engine.stop()
         round++
         val state = _ui.value
+        val seed = round * 41 + 11
+        if (state.fullRandom) {
+            val (clef, range, q) = NoteReadFactory.randomAny(
+                seed = seed,
+                allowAccidentals = state.allowAccidentals
+            )
+            _ui.update {
+                it.copy(
+                    clef = clef,
+                    range = range,
+                    question = q,
+                    phase = NoteReadPhase.Ready,
+                    selectedMidi = null,
+                    correct = null
+                )
+            }
+            if (play) engine.playNote(q.midi)
+            return
+        }
+
         val q = NoteReadFactory.random(
-            seed = round * 41 + 11,
+            seed = seed,
             range = state.range,
             allowAccidentals = state.allowAccidentals
         )

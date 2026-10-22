@@ -64,9 +64,14 @@ fun NoteReadScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
+            FilterChip(
+                selected = state.fullRandom,
+                onClick = viewModel::toggleFullRandom,
+                label = { Text("全随机") }
+            )
             NoteClef.entries.forEach { clef ->
                 FilterChip(
-                    selected = clef == state.clef,
+                    selected = !state.fullRandom && clef == state.clef,
                     onClick = { viewModel.selectClef(clef) },
                     label = { Text(clef.labelZh) }
                 )
@@ -77,9 +82,11 @@ fun NoteReadScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            ranges.forEach { range ->
+            // In full-random, show all ranges unselected; otherwise clef-filtered.
+            val rangeChoices = if (state.fullRandom) NoteRange.entries else ranges
+            rangeChoices.forEach { range ->
                 FilterChip(
-                    selected = range == state.range,
+                    selected = !state.fullRandom && range == state.range,
                     onClick = { viewModel.selectRange(range) },
                     label = { Text(range.labelZh) }
                 )

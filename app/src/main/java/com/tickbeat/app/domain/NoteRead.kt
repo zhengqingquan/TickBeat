@@ -61,6 +61,19 @@ object NoteReadFactory {
         return pool[rnd.nextInt(pool.size)]
     }
 
+    /** Pick a random clef + suitable octave, then a note in that octave. */
+    fun randomAny(
+        seed: Int,
+        allowAccidentals: Boolean = true
+    ): Triple<NoteClef, NoteRange, NoteReadQuestion> {
+        val rnd = kotlin.random.Random(seed)
+        val clef = NoteClef.entries[rnd.nextInt(NoteClef.entries.size)]
+        val ranges = NoteRange.forClef(clef)
+        val range = ranges[rnd.nextInt(ranges.size)]
+        val q = random(seed = seed * 17 + 3, range = range, allowAccidentals = allowAccidentals)
+        return Triple(clef, range, q)
+    }
+
     /** VexFlow key string, e.g. "c/4", "c#/5". */
     fun vexKey(midi: Int): String {
         val names = arrayOf("c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b")
