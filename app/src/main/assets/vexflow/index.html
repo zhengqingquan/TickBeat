@@ -360,9 +360,17 @@
         }
       }
 
-      noteEls = Array.from(paper.querySelectorAll(".vf-stavenote")).filter(function (el) {
-        return !el.classList.contains("vf-rest") && !el.querySelector(".vf-rest");
-      });
+      // VexFlow 4 rests are plain .vf-stavenote (no .vf-rest class). Bind SVG
+      // from drawnNotes so rests never enter highlight/grade index alignment.
+      noteEls = drawnNotes.map(function (d) {
+        if (d.note && typeof d.note.getSVGElement === "function") {
+          var el = d.note.getSVGElement();
+          if (el) return el;
+        }
+        var id = d.note && d.note.attrs && d.note.attrs.id;
+        if (id) return paper.querySelector("#vf-" + id);
+        return null;
+      }).filter(Boolean);
       bindNoteStems(paper);
 
       ready = true;
