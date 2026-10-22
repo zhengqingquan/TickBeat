@@ -48,16 +48,31 @@
       return Math.max(200, fallback || 360);
     }
 
+    function paintShape(node, fill) {
+      if (!node || !fill) return;
+      if (node.getAttribute("fill") !== "none") {
+        node.style.fill = fill;
+        node.setAttribute("fill", fill);
+      }
+      node.style.stroke = fill;
+      node.setAttribute("stroke", fill);
+    }
+
+    /**
+     * Color notehead + stem (+ filled accidental glyphs).
+     * Do NOT tint ledger lines — they are fill="none" stroke paths under .vf-stavenote.
+     */
     function paintNoteColor(fill) {
       var paper = document.getElementById("paper");
       if (!paper || !fill) return;
-      paper.querySelectorAll(".vf-stavenote path, .vf-stavenote rect, .vf-stavenote line, .vf-stavenote polygon, .vf-stem path, .vf-stem line, .vf-accidental path").forEach(function (p) {
-        if (p.getAttribute("fill") !== "none") {
-          p.style.fill = fill;
-          p.setAttribute("fill", fill);
-        }
-        p.style.stroke = fill;
-        p.setAttribute("stroke", fill);
+      paper.querySelectorAll(".vf-notehead path, .vf-notehead rect, .vf-notehead polygon, .vf-stem path, .vf-stem line, .vf-stem polygon").forEach(function (p) {
+        paintShape(p, fill);
+      });
+      // Accidentals are filled glyphs, not stroke-only ledger lines.
+      paper.querySelectorAll(".vf-stavenote path, .vf-stavenote polygon").forEach(function (p) {
+        if (p.closest(".vf-notehead") || p.closest(".vf-stem")) return;
+        if (p.getAttribute("fill") === "none") return;
+        paintShape(p, fill);
       });
     }
 
